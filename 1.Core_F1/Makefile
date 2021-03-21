@@ -9,7 +9,7 @@ DEBUG = dwarf-2
 
 startup = lib/startup_code/startup_stm32f10x_md.s
 INCLUDS = -Ilib/include/
-LINKERCMDFILE = lib/linker_scripts/stm32f10xC8.ld
+LINKERCMDFILE = -Llib/linker_scripts -Tlib/linker_scripts/stm32f10xC8.ld
 
 DEVCLASS =  STM32F103xB
 
@@ -18,7 +18,7 @@ CFLAGS = -fno-builtin -Wall
 CFLAGS += -MD -MP -MT $(builddir)/$(*F).o -MF $(builddir)/dep/$(@F).mk
 CFLAGS += -mthumb -mcpu=cortex-m3 -g$(DEBUG) -O$(OPTIMIZE) -D$(DEVCLASS) $(INCLUDS) -DGCC_ARMCM3 -DVECT_TAB_FLASH
 ASMFLAGS = -ahls -mapcs-32
-LFLAGS  = -T$(LINKERCMDFILE) -nostartfiles -Wl,-Map -Wl,$(builddir)/$(progname).map -mthumb -mcpu=cortex-m3
+LFLAGS  = $(LINKERCMDFILE) -nostartfiles -Wl,-Map -Wl,$(builddir)/$(progname).map -mthumb -mcpu=cortex-m3
 
 CC      = arm-none-eabi-gcc
 CPP      = arm-none-eabi-g++
@@ -47,7 +47,7 @@ $(frmname).lss: $(frmname).elf
 	$(OD) -D -S $(frmname).elf > $(frmname).lss
 size: $(frmname).elf
 	$(SZ) $(frmname).elf
-$(frmname).elf: $(objs) $(LINKERCMDFILE) $(builddir)/crt.o
+$(frmname).elf: $(objs) $(builddir)/crt.o
 	mkdir -p $(progdir)
 	@ echo "..linking"
 	$(LD) $(LFLAGS) -o $(frmname).elf $(builddir)/crt.o -L../ld $(objs)
