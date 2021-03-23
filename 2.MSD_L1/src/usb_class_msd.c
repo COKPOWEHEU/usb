@@ -269,7 +269,7 @@ static void msc_ep1_in(uint8_t epnum);
 static void msc_ep1_out(uint8_t epnum){
   int left = sizeof(usb_msc_cbw_t) - msc_cbw_count;
   if(left > 0){ //чтение команды
-    int sz = usb_ep_read(1, (uint16_t*)&(((uint8_t*)&msc_cbw)[msc_cbw_count]) );
+    int sz = usb_ep_read(ENDP_NUM, (uint16_t*)&(((uint8_t*)&msc_cbw)[msc_cbw_count]) );
     msc_cbw_count += sz;
     if(msc_cbw_count == sizeof(usb_msc_cbw_t)){ //команда прочитана полностью
       scsi_command();
@@ -278,15 +278,15 @@ static void msc_ep1_out(uint8_t epnum){
     uint8_t lun = msc_cbw.bLUN;
     int sz;
     if(lun == 0){
-      sz = usb_ep_read(1, (uint16_t*)&buffer[0]);
+      sz = usb_ep_read(ENDP_NUM, (uint16_t*)&buffer[0]);
     }else{
-      sz = usb_ep_read(1, (uint16_t*)&rambuf[ start_lba*512 + bytescount ]);
+      sz = usb_ep_read(ENDP_NUM, (uint16_t*)&rambuf[ start_lba*512 + bytescount ]);
       cur_count += sz;
     }
     bytescount += sz;
   }
   if(bytescount < bytestoread)return;
-  msc_ep1_in(epnum | 0x80);
+  msc_ep1_in(ENDP_NUM | 0x80);
 }
 
 static void msc_ep1_in(uint8_t epnum){
@@ -296,10 +296,10 @@ static void msc_ep1_in(uint8_t epnum){
     uint32_t left = bytestowrite - bytescount;
     if(left > ENDP_SIZE)left = ENDP_SIZE;
     if(block_count == 0){
-      usb_ep_write(1, &buffer[bytescount], left);
+      usb_ep_write(ENDP_NUM, &buffer[bytescount], left);
     }else{
       uint8_t lun = msc_cbw.bLUN;
-      usb_ep_write(1, &storage[lun].buf[start_lba*512 + bytescount], left);
+      usb_ep_write(ENDP_NUM, &storage[lun].buf[start_lba*512 + bytescount], left);
       cur_count += left;
     }
     bytescount += left;
@@ -307,7 +307,7 @@ static void msc_ep1_in(uint8_t epnum){
     int32_t left = sizeof(msc_csw) - msc_csw_count;
     if(left > 0){
       if(left > ENDP_SIZE)left = ENDP_SIZE;
-      usb_ep_write(1, (uint8_t*)&(((uint8_t*)&msc_csw)[msc_csw_count]), left);
+      usb_ep_write(ENDP_NUM, (uint8_t*)&(((uint8_t*)&msc_csw)[msc_csw_count]), left);
       msc_csw_count += left;
     }else if(left == 0){
       msc_cbw_count = 0;
