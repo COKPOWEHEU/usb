@@ -345,6 +345,8 @@ void usb_class_init(){
 #define SCSI_READ_10			0x28
 #define SCSI_WRITE_10			0x2A
 
+#define SCSI_MMC_START_STOP_UNIT      0x1B
+#define SCSI_MMC_PREVENT_ALLOW_REMOVAL 0x1E
 #define SCSI_MMC_READ_FORMAT_CAPACITY 0x23 //винда очень любит этот запрос, а коррекно обрабатывать ответ "не поддерживаю" не умеет
 
 typedef struct{
@@ -567,6 +569,9 @@ void scsi_command(){
       break;
     case SCSI_MMC_READ_FORMAT_CAPACITY:
       scsi_mmc_read_fmt_cap();
+      break;
+    case SCSI_MMC_START_STOP_UNIT:
+    case SCSI_MMC_PREVENT_ALLOW_REMOVAL:
       break;
     default:
       msc_csw.bStatus = CSW_STATUS_FAILED;
