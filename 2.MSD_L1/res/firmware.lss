@@ -2189,7 +2189,7 @@ Disassembly of section .rodata:
 
 08000e7a <USB_DeviceDescriptor>:
 static const uint8_t USB_DeviceDescriptor[] = {
- 8000e7a:	02000112 	andeq	r0, r0, #-2147483644	; 0x80000004
+ 8000e7a:	01100112 	tsteq	r0, r2, lsl r1
  8000e7e:	40000000 	andmi	r0, r0, r0
  8000e82:	05df16c0 	ldrbeq	r1, [pc, #1728]	; 800154a <_binary_src_fatexample_img_start+0x629>
  8000e86:	02010001 	andeq	r0, r1, #1

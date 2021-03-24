@@ -30,7 +30,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
-  USB_U16(0x0200), // bcdUSB
+  USB_U16(0x0110), // bcdUSB
   0,   // bDevice Class
   0,   // bDevice SubClass
   0,   // bDevice Protocol
