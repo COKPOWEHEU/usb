@@ -1,6 +1,7 @@
 #include "usb_lib.h"
 #include <wchar.h>
 #include "hardware.h"
+#include "usb_hid.h"
 
 #define INTR_NUM 1
 #define INTR_SIZE 64
@@ -18,12 +19,6 @@
 #define HIDREQ_GET_REPORT     1
 #define HIDREQ_SET_REPORT     9
 
-#define HIDCLASS_HID          3
-#define HIDSUBCLASS_NONE      0
-#define HIDSUBCLASS_BOOT      1
-#define HIDPROTOCOL_NONE      0
-#define HIDPROTOCOL_KEYBOARD  1
-#define HIDPROTOCOL_MOUSE     2
 
 static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
@@ -59,65 +54,59 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
 };
 
 static const uint8_t USB_HIDDescriptor[] = {
-    0x05, 0x01, // Usage Page (Generic Desktop)           
-    0x09, 0x02, // Usage (Mouse)                          
-    0xA1, 0x01, // Collection (Application)               
-    0x09, 0x01, //  Usage (Pointer)                       
-    0xA1, 0x00, //  Collection (Physical)                 
-    0x85, 0x01, //   Report ID
-    0x05, 0x09, //      Usage Page (Buttons)              
-    0x19, 0x01, //      Usage Minimum (01)                
-    0x29, 0x03, //      Usage Maximum (03)                
-    0x15, 0x00, //      Logical Minimum (0)               
-    0x25, 0x01, //      Logical Maximum (0)               
-    0x95, 0x03, //      Report Count (3)                  
-    0x75, 0x01, //      Report Size (1)                   
-    0x81, 0x02, //      Input (Data, Variable, Absolute)  
-    0x95, 0x01, //      Report Count (1)                  
-    0x75, 0x05, //      Report Size (5)                   
-    0x81, 0x01, //      Input (Constant)    ;5 bit padding
-    0x05, 0x01, //      Usage Page (Generic Desktop)      
-    0x09, 0x30, //      Usage (X)                         
-    0x09, 0x31, //      Usage (Y)                         
-    0x15, 0x81, //      Logical Minimum (-127)            
-    0x25, 0x7F, //      Logical Maximum (127)             
-    0x75, 0x08, //      Report Size (8)                   
-    0x95, 0x02, //      Report Count (2)                  
-    0x81, 0x06, //      Input (Data, Variable, Relative)  
-    0xC0, 0xC0, // End Collection,End Collection          
-//
-    0x09, 0x06, //		Usage (Keyboard)        
-    0xA1, 0x01, //		Collection (Application)
-    0x85, 0x02, //   Report ID
-    0x05, 0x07, //  	Usage (Key codes)                 
-    0x19, 0xE0, //      Usage Minimum (224)               
-    0x29, 0xE7, //      Usage Maximum (231)               
-    0x15, 0x00, //      Logical Minimum (0)               
-    0x25, 0x01, //      Logical Maximum (1)               
-    0x75, 0x01, //      Report Size (1)                   
-    0x95, 0x08, //      Report Count (8)                  
-    0x81, 0x02, //      Input (Data, Variable, Absolute)  
-    0x95, 0x01, //      Report Count (1)                  
-    0x75, 0x08, //      Report Size (8)                   
-    0x81, 0x01, //      Input (Constant)    ;5 bit padding
-    0x95, 0x05, //      Report Count (5)                  
-    0x75, 0x01, //      Report Size (1)                   
-    0x05, 0x08, //      Usage Page (Page# for LEDs)       
-    0x19, 0x01, //      Usage Minimum (01)                
-    0x29, 0x05, //      Usage Maximum (05)                
-    0x91, 0x02, //      Output (Data, Variable, Absolute) 
-    0x95, 0x01, //      Report Count (1)                  
-    0x75, 0x03, //      Report Size (3)                   
-    0x91, 0x01, //      Output (Constant)                 
-    0x95, 0x06, //      Report Count (1)                  
-    0x75, 0x08, //      Report Size (3)                   
-    0x15, 0x00, //      Logical Minimum (0)               
-    0x25, 0x65, //      Logical Maximum (101)             
-    0x05, 0x07, //  	Usage (Key codes)                 
-    0x19, 0x00, //      Usage Minimum (00)                
-    0x29, 0x65, //      Usage Maximum (101)               
-    0x81, 0x00, //      Input (Data, Array)               
-    0xC0        // 		End Collection,End Collection     
+  //keyboard
+  USAGE_PAGE( USAGEPAGE_GENERIC ),//0x05, 0x01,
+  USAGE( USAGE_KEYBOARD ), // 0x09, 0x06,
+  COLLECTION( COLL_APPLICATION, // 0xA1, 0x01,
+    REPORT_ID( 1 ), // 0x85, 0x01,
+    USAGE_PAGE( USAGEPAGE_KEYBOARD ), // 0x05, 0x07,
+    USAGE_MINMAX(224, 231), //0x19, 0xE0, 0x29, 0xE7,    
+    LOGICAL_MINMAX(0, 1), //0x15, 0x00, 0x25, 0x01,
+    REPORT_FMT(1, 8), //0x75, 0x01, 0x95, 0x08     
+    INPUT_HID( HID_DATA | HID_VAR | HID_ABS ), // 0x81, 0x02,
+     //reserved (???)
+    REPORT_FMT(8, 1), // 0x75, 0x08, 0x95, 0x01,
+    INPUT_HID(HID_CONST), // 0x81, 0x01,
+              
+    REPORT_FMT(1, 5),  // 0x75, 0x01, 0x95, 0x05,
+    USAGE_PAGE( USAGEPAGE_LEDS ), // 0x05, 0x08,
+    USAGE_MINMAX(1, 5), //0x19, 0x01, 0x29, 0x05,  
+    OUTPUT_HID( HID_DATA | HID_VAR | HID_ABS ), // 0x91, 0x02,
+    //выравнивание до 1 байта
+    REPORT_FMT(3, 1), // 0x75, 0x03, 0x95, 0x01,
+    OUTPUT_HID( HID_CONST ), // 0x91, 0x01,
+    REPORT_FMT(8, 6),  // 0x75, 0x08, 0x95, 0x06,
+    LOGICAL_MINMAX(0, 101), // 0x15, 0x00, 0x25, 0x65,         
+    USAGE_PAGE( USAGEPAGE_KEYBOARD ), // 0x05, 0x07,
+    USAGE_MINMAX(0, 101), // 0x19, 0x00, 0x29, 0x65,
+    INPUT_HID( HID_DATA | HID_ARR ), // 0x81, 0x00,           
+  )
+  //touchscreen
+  USAGE_PAGE( USAGEPAGE_DIGITIZER ), // 0x05, 0x0D,
+  USAGE( USAGE_PEN ), // 0x09, 0x02,
+  COLLECTION( COLL_APPLICATION, // 0xA1, 0x0x01,
+    REPORT_ID( 2 ), //0x85, 0x02,
+    USAGE( USAGE_FINGER ), // 0x09, 0x22,
+    COLLECTION( COLL_PHISICAL, // 0xA1, 0x00,
+      USAGE( USAGE_TIPSWITCH ), // 0x09, 0x42,
+      USAGE( USAGE_IN_RANGE ), // 0x09, 0x32,
+      LOGICAL_MINMAX( 0, 1), // 0x15, 0x00, 0x25, 0x01,
+      REPORT_FMT( 1, 2 ), // 0x75, 0x01, 0x95, 0x02,
+      INPUT_HID( HID_VAR | HID_DATA | HID_ABS ), // 0x91, 0x02,
+      REPORT_FMT( 1, 6 ), // 0x75, 0x01, 0x95, 0x06,
+      INPUT_HID( HID_CONST ), // 0x81, 0x01,
+                
+      USAGE_PAGE( USAGEPAGE_GENERIC ), //0x05, 0x01,
+      USAGE( USAGE_POINTER ), // 0x09, 0x01,
+      COLLECTION( COLL_PHISICAL, // 0xA1, 0x00,
+        USAGE( USAGE_X ), // 0x09, 0x30,
+        USAGE( USAGE_Y ), // 0x09, 0x31,
+        LOGICAL_MINMAX16( 0, 10000 ), //0x16, 0x00, 0x00, 0x26, 0x10, 0x27,
+        REPORT_FMT( 16, 2 ), // 0x75, 0x10, 0x95, 0x02,
+        INPUT_HID( HID_VAR | HID_ABS | HID_DATA), // 0x91, 0x02,
+      )
+    )
+  )
 };
 
 static const uint8_t USB_ConfigDescriptor[] = {
@@ -137,7 +126,7 @@ static const uint8_t USB_ConfigDescriptor[] = {
     USB_DESCR_INTERFACE, //bDescriptorType
     0, //bInterfaceNumber
     0, // bAlternateSetting
-    1, // bNumEndpoints
+    2, // bNumEndpoints
     HIDCLASS_HID, // bInterfaceClass: 
     HIDSUBCLASS_BOOT, // bInterfaceSubClass: 
     HIDPROTOCOL_KEYBOARD, // bInterfaceProtocol: 
@@ -155,10 +144,18 @@ static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN1(
     bLENGTH, //bLength
     USB_DESCR_ENDPOINT, //bDescriptorType
+    INTR_NUM, //bEdnpointAddress
+    USB_ENDP_INTR, //bmAttributes
+    USB_U16( INTR_SIZE ), //MaxPacketSize
+    10, //bInterval
+  )
+  ARRLEN1(
+    bLENGTH, //bLength
+    USB_DESCR_ENDPOINT, //bDescriptorType
     INTR_NUM | 0x80, //bEdnpointAddress
     USB_ENDP_INTR, //bmAttributes
     USB_U16( INTR_SIZE ), //MaxPacketSize
-    100, //bInterval
+    10, //bInterval
   )
   )
 };
@@ -219,48 +216,87 @@ char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){
   return 0;
 }
 
-uint8_t kbd_buf[9] = {2, 0, 0, 0, 0, 0, 0, 0, 0};
-
 static void intr_req(uint8_t epnum){
-  if(kbd_buf[3] == 0)return;
-  kbd_buf[3] = 0;
-  usb_ep_write(INTR_NUM | 0x80, kbd_buf, sizeof(kbd_buf));
+}
+
+static void outp_req(uint8_t epnum){
+  uint8_t buf[10];
+  usb_ep_read(INTR_NUM, (void*)&buf);
+  if(buf[1] & (1<<HID_KBDLED_CAPSLOCK))GPO_ON(RLED); else GPO_OFF(RLED);
+  if(buf[1] & (1<<HID_KBDLED_NUMLOCK))GPO_ON(GLED); else GPO_OFF(GLED);
 }
 
 void usb_class_init(){
+  usb_ep_init( INTR_NUM, USB_ENDP_INTR, INTR_SIZE, outp_req);
   usb_ep_init( INTR_NUM | 0x80, USB_ENDP_INTR, INTR_SIZE, intr_req);
 }
 
-/*
- * MOUSE
- * buf[0]: 1 - report ID
- * buf[1]: bit2 - middle button, bit1 - right, bit0 - left
- * buf[2]: move X
- * buf[3]: move Y
- * buf[4]: wheel
- */
+struct{
+  uint8_t report_id;
+  union{
+    uint8_t modifiers;
+    struct{
+      uint8_t lctrl:1;
+      uint8_t lshift:1;
+      uint8_t lalt:1;
+      uint8_t lgui:1;
+      uint8_t rctrl:1;
+      uint8_t rshift:1;
+      uint8_t ralt:1;
+      uint8_t rgui:1;
+    };
+  };
+  uint8_t reserved;
+  uint8_t keys[6];
+}__attribute__((packed)) report_kbd = {
+  .report_id = 1,
+  .modifiers = 0,
+  .keys = {0,0,0,0,0,0},
+};
 
-/*
- * Keyboard buffer:
- * buf[0]: 2 - report ID
- * buf[1]: MOD - клавиши модификаторы
- * buf[2]: reserved
- * buf[3]..buf[8] - keycodes 1..6
- */
+struct{
+  uint8_t report_id;
+  union{
+    uint8_t buttons;
+    struct{
+      uint8_t button:1;
+      uint8_t inrange:1;
+      uint8_t reserved:6;
+    };
+  };
+  uint16_t x;
+  uint16_t y;
+}__attribute__((packed)) report_tablet = {
+  .report_id = 2,
+  .button = 0,
+  .x = 1000,
+  .y = 1000,
+};
+
+void delay(uint32_t t){
+  for(;t;t--)asm volatile("nop");
+}
+
 void usb_class_poll(){
-  uint8_t data[8];
+  uint8_t data[15];
   if(GPI_ON( LBTN )){
     while( GPI_ON(LBTN) ){}
-    data[0] = 1;
-    data[1] = 0x00;
-    data[2] = (uint8_t)100;
-    data[3] = (uint8_t)100;
-    data[4] = 0;
-    usb_ep_write(INTR_NUM | 0x80, data, 5);
+    report_tablet.button = 1;
+    report_tablet.inrange = 1;
+    report_tablet.x = 5000;
+    report_tablet.y = 5000;
+    usb_ep_write(INTR_NUM | 0x80, (void*)&report_tablet, sizeof(report_tablet));
+    delay(1000000);
+    report_tablet.button = 0;
+    report_tablet.inrange = 0;
+    usb_ep_write(INTR_NUM | 0x80, (void*)&report_tablet, sizeof(report_tablet));
   }
   if(GPI_ON( JBTN )){
     while( GPI_ON(JBTN) ){}
-    kbd_buf[3] = 10;
-    usb_ep_write(INTR_NUM | 0x80, kbd_buf, sizeof(kbd_buf));
+    report_kbd.keys[0] = 10;
+    usb_ep_write(INTR_NUM | 0x80, (void*)&report_kbd, sizeof(report_kbd));
+    delay(1000000);
+    report_kbd.keys[0] = 0;
+    usb_ep_write(INTR_NUM | 0x80, (void*)&report_kbd, sizeof(report_kbd));
   }
 }
