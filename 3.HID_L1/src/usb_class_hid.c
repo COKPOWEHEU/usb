@@ -261,8 +261,7 @@ struct{
     struct{
       uint8_t touch:1;
       uint8_t inrange:1;
-      uint8_t button2:1;
-      uint8_t reserved:5;
+      uint8_t reserved:6;
     };
   };
   uint16_t x;
@@ -292,10 +291,15 @@ void usb_class_poll(){
   }
   if(GPI_ON( JBTN )){
     while( GPI_ON(JBTN) ){}
-    report_kbd.keys[0] = 10;
+    report_kbd.lshift = 1;
+    report_kbd.keys[0] = 0x06;
+    report_kbd.keys[1] = 0x12;
+    report_kbd.keys[2] = 0x0E;
+    report_kbd.keys[3] = 0x13;
     usb_ep_write(INTR_NUM | 0x80, (void*)&report_kbd, sizeof(report_kbd));
     delay(1000000);
-    report_kbd.keys[0] = 0;
+    report_kbd.modifiers = report_kbd.keys[0] = report_kbd.keys[1] = report_kbd.keys[2] = report_kbd.keys[3] = 0;
+    
     usb_ep_write(INTR_NUM | 0x80, (void*)&report_kbd, sizeof(report_kbd));
   }
 }
