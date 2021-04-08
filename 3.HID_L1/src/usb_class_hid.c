@@ -88,7 +88,7 @@ static const uint8_t USB_HIDDescriptor[] = {
     REPORT_ID( 2 ), //0x85, 0x02,
     USAGE( USAGE_FINGER ), // 0x09, 0x22,
     COLLECTION( COLL_PHISICAL, // 0xA1, 0x00,
-      USAGE( USAGE_TIPSWITCH ), // 0x09, 0x42,
+      USAGE( USAGE_TOUCH ), // 0x09, 0x42,
       USAGE( USAGE_IN_RANGE ), // 0x09, 0x32,
       LOGICAL_MINMAX( 0, 1), // 0x15, 0x00, 0x25, 0x01,
       REPORT_FMT( 1, 2 ), // 0x75, 0x01, 0x95, 0x02,
@@ -98,7 +98,7 @@ static const uint8_t USB_HIDDescriptor[] = {
                 
       USAGE_PAGE( USAGEPAGE_GENERIC ), //0x05, 0x01,
       USAGE( USAGE_POINTER ), // 0x09, 0x01,
-      COLLECTION( COLL_PHISICAL, // 0xA1, 0x00,
+      COLLECTION( COLL_PHISICAL, // 0xA1, 0x00,         
         USAGE( USAGE_X ), // 0x09, 0x30,
         USAGE( USAGE_Y ), // 0x09, 0x31,
         LOGICAL_MINMAX16( 0, 10000 ), //0x16, 0x00, 0x00, 0x26, 0x10, 0x27,
@@ -259,16 +259,17 @@ struct{
   union{
     uint8_t buttons;
     struct{
-      uint8_t button:1;
+      uint8_t touch:1;
       uint8_t inrange:1;
-      uint8_t reserved:6;
+      uint8_t button2:1;
+      uint8_t reserved:5;
     };
   };
   uint16_t x;
   uint16_t y;
 }__attribute__((packed)) report_tablet = {
   .report_id = 2,
-  .button = 0,
+  .buttons = 0,
   .x = 1000,
   .y = 1000,
 };
@@ -278,17 +279,15 @@ void delay(uint32_t t){
 }
 
 void usb_class_poll(){
-  uint8_t data[15];
   if(GPI_ON( LBTN )){
     while( GPI_ON(LBTN) ){}
-    report_tablet.button = 1;
+    report_tablet.touch = 1;
     report_tablet.inrange = 1;
     report_tablet.x = 5000;
     report_tablet.y = 5000;
     usb_ep_write(INTR_NUM | 0x80, (void*)&report_tablet, sizeof(report_tablet));
     delay(1000000);
-    report_tablet.button = 0;
-    report_tablet.inrange = 0;
+    report_tablet.buttons = 0;
     usb_ep_write(INTR_NUM | 0x80, (void*)&report_tablet, sizeof(report_tablet));
   }
   if(GPI_ON( JBTN )){

@@ -32,6 +32,10 @@
 #define USAGE_DIAL            0x37 //DV
 #define USAGE_WHEEL           0x38 //DV
 #define USAGE_HATSWITCH       0x39 //DV
+//buttons
+#define USAGE_BTN1            0x01
+#define USAGE_BTN2            0x02
+#define USAGE_BTN3            0x03
 //digitizer
 #define USAGE_DIGITIZER       0x01 //CA
 #define USAGE_PEN             0x02 //CA
