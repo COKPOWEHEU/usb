@@ -4,14 +4,13 @@
 #include "usb_audio.h"
 
 #define ENDP_DATA_NUM 1
+#define ENDP_IN_NUM   2
 #define ENDP_DATA_SIZE 64
 
 #define STD_DESCR_LANG 0
 #define STD_DESCR_VEND 1
 #define STD_DESCR_PROD 2
 #define STD_DESCR_SN   3
-#define STD_DESCR_CONF 4
-#define STD_DESCR_IF   5
 
 #define USB_VID 0x16C0
 #define USB_PID 0x05DF
@@ -58,7 +57,7 @@ static const uint8_t USB_ConfigDescriptor[] = {
     bLENGTH, // bLength: Configuration Descriptor size
     USB_DESCR_CONFIG,    //bDescriptorType: Configuration
     wTOTALLENGTH, //wTotalLength
-    2, // bNumInterfaces
+    3, // bNumInterfaces
     1, // bConfigurationValue: Configuration value
     0, // iConfiguration: Index of string descriptor describing the configuration
     0x80, // bmAttributes: bus powered
@@ -80,29 +79,61 @@ static const uint8_t USB_ConfigDescriptor[] = {
         bLENGTH, //bLength
         USB_DESCR_CS_INTERFACE, //bDescriptorType
         1, //bDescriptorSubType
-        USB_U16(1), //bcdADC //AudioDeviceClass серийный номер
+        USB_U16(0x0100), //bcdADC //AudioDeviceClass серийный номер
         wTOTALLENGTH, //wTotalLength
-        1, //bInCollection //количество интерфейсов в коллекции
+        2, //bInCollection //количество интерфейсов в коллекции
         1, //bInterfaceNr(1), //массив (список) номеров интерфейсов в коллекции
-        //bInterfaceNr(2), ...
+        2,////bInterfaceNr(2), ...
       )
       ARRLEN1(//1. AC Input terminal
         bLENGTH, //bLength
         USB_DESCR_CS_INTERFACE, //bDescriptorType
         USBAUDIO_IF_TERM_IN, //bDescriptorSubType
         1, //bTerminalID
-        USB_U16( USBAUDIO_TERMINAL_MIC ), //wTerminalTypeЧто это вообще такое (а вариантов немало!)
+        USB_U16( USBAUDIO_TERMINAL_USB ),//USB_U16( USBAUDIO_TERMINAL_MIC ), //wTerminalTypeЧто это вообще такое (а вариантов немало!)
         0, //bAssocTerminal привязка выходного терминала для создания пары. Не используем
         1, //bNrChannels
         USB_U16( 0 ), //wChannelConfig //к чему именно подключены каналы
         0, //iChannelNames
         0, //iTerminal
       )
-      ARRLEN1(//2. AC Feature Unit
+      ARRLEN1(//2. AC Input terminal
+        bLENGTH, //bLength
+        USB_DESCR_CS_INTERFACE, //bDescriptorType
+        USBAUDIO_IF_TERM_IN, //bDescriptorSubType
+        2, //bTerminalID
+        USB_U16( USBAUDIO_TERMINAL_MIC ),//USB_U16( USBAUDIO_TERMINAL_MIC ), //wTerminalTypeЧто это вообще такое (а вариантов немало!)
+        0, //bAssocTerminal привязка выходного терминала для создания пары. Не используем
+        1, //bNrChannels
+        USB_U16( 0 ), //wChannelConfig //к чему именно подключены каналы
+        0, //iChannelNames
+        0, //iTerminal
+      )
+      ARRLEN1(//5. AC Output Terminal
+        bLENGTH, //bLength
+        USB_DESCR_CS_INTERFACE, //bDescriptorType
+        USBAUDIO_IF_TERM_OUT, //bDescriptorSubType
+        5, //bTerminalID
+        USB_U16( USBAUDIO_TERMINAL_SPEAKER ),//USB_U16( USBAUDIO_TERMINAL_USB ), //wTerminalType:speaker
+        0, //bAssocTerminal
+        3, //bSourceID  <-------------------------------------------
+        0, //iTerminal
+      )
+      ARRLEN1(//6. AC Output Terminal
+        bLENGTH, //bLength
+        USB_DESCR_CS_INTERFACE, //bDescriptorType
+        USBAUDIO_IF_TERM_OUT, //bDescriptorSubType
+        6, //bTerminalID
+        USB_U16( USBAUDIO_TERMINAL_USB ),//USB_U16( USBAUDIO_TERMINAL_USB ), //wTerminalType:speaker
+        0, //bAssocTerminal
+        4, //bSourceID  <-------------------------------------------
+        0, //iTerminal
+      )
+      ARRLEN1(//3. AC Feature Unit
         bLENGTH, //bLength
         USB_DESCR_CS_INTERFACE, //bDescriptorType
         USBAUDIO_IF_FEATURE, //bDescriptorSubType
-        2, //UnitID
+        3, //UnitID
         1, //bSourceID  <---------------------------------------------
         1, //bControlSize //размер одного элемента в массиве
         //bmaControls чем именно можно управлять
@@ -111,17 +142,21 @@ static const uint8_t USB_ConfigDescriptor[] = {
           //нужно описать оба канала?
         0, //iFeature
       )
-      ARRLEN1(//3. AC Output Terminal
+      ARRLEN1(//4. AC Feature Unit
         bLENGTH, //bLength
         USB_DESCR_CS_INTERFACE, //bDescriptorType
-        USBAUDIO_IF_TERM_OUT, //bDescriptorSubType
-        3, //bTerminalID
-        USB_U16( USBAUDIO_TERMINAL_USB ), //wTerminalType:speaker
-        0, //bAssocTerminal
-        2, //bSourceID  <-------------------------------------------
-        0, //iTerminal
+        USBAUDIO_IF_FEATURE, //bDescriptorSubType
+        4, //UnitID
+        2, //bSourceID  <---------------------------------------------
+        1, //bControlSize //размер одного элемента в массиве
+        //bmaControls чем именно можно управлять
+          USBAUDIO_FEATURE_MUTE, //Channel(0)
+          USBAUDIO_FEATURE_NONE, //Channel(1) канал 1 - Mute
+          //нужно описать оба канала?
+        0, //iFeature
       )
     )
+    
   ARRLEN1(//1 Audio Streaming Interface
     bLENGTH, //bLength
     USB_DESCR_INTERFACE, //bDescriptorType
@@ -144,12 +179,11 @@ static const uint8_t USB_ConfigDescriptor[] = {
     0, //bInterfaceProtocol
     0, //iInterface
   )
-  
   ARRLEN1(//AS Interface
     bLENGTH, //bLength
     USB_DESCR_CS_INTERFACE, //bDescriptorType
     USBAUDIO_AS_GENERAL, //bDescriptorSubType
-    3, //bTerminalLink  <----------------------------------------
+    6, //bTerminalLink  <----------------------------------------
     1, //bDelay //задержка, вносимая устройством (в единицах числа фреймов)
     USB_U16( USBAUDIO_FORMAT_PCM ), //wFormatTag=PCM, тип кодирования данных //TODO описать возможные типы
   )
@@ -164,11 +198,70 @@ static const uint8_t USB_ConfigDescriptor[] = {
     1, //bSamFreqType //количество поддерживаемых частот
     USB_AC24(F_SAMPLE), //tSamFreq //(6 байт!) массив диапазонов частот
   )
-  
   ARRLEN1(//Endpoint descriptor
     bLENGTH, //bLength
     USB_DESCR_ENDPOINT, //bDescriptorType
-    ENDP_DATA_NUM | 0x80, 
+    ENDP_IN_NUM | 0x80, 
+    USB_ENDP_ISO, //Isochronous / Synch=none / usage=data
+    USB_U16(ENDP_DATA_SIZE),
+    1, //bInterval - частота опроса, для изохронных всегда 1
+    0, //bRefresh - хз что это, сказано выставить в 0
+    0, //bSynchAddress - адрес endpoint'а для синхронизации
+  )
+  ARRLEN1(//Isochronous endpoint descriptor
+    bLENGTH, //bLength
+    USB_DESCR_ENDP_ISO, //bDescriptorType
+    1, //bDescriptorSubType
+    0, //bmAttributes
+    0, //bLockDelayUnits (undefned)
+    USB_U16(0), //wLockDelay
+  )
+   
+  ARRLEN1(//1 Audio Streaming Interface
+    bLENGTH, //bLength
+    USB_DESCR_INTERFACE, //bDescriptorType
+    2, //bInterfaceNumber
+    0, //bAlternateSetting
+    0, //bNumEndpoints
+    USB_CLASS_AUDIO, //bInterfaceClass
+    USB_SUBCLASS_AUDIOSTREAMING, //bInterfaceSubClass
+    0, //bInterfaceProtocol
+    0, //iInterface
+  )
+  ARRLEN1(//1alt Audio Streaming Interface (alternative)
+    bLENGTH, //bLength
+    USB_DESCR_INTERFACE, //bDescriptorType
+    2, //bInterfaceNumber
+    1, //bAlternateSetting
+    1, //bNumEndpoints
+    USB_CLASS_AUDIO, //bInterfaceClass
+    USB_SUBCLASS_AUDIOSTREAMING, //bInterfaceSubClass
+    0, //bInterfaceProtocol
+    0, //iInterface
+  )
+  ARRLEN1(//AS Interface
+    bLENGTH, //bLength
+    USB_DESCR_CS_INTERFACE, //bDescriptorType
+    USBAUDIO_AS_GENERAL, //bDescriptorSubType
+    1, //bTerminalLink  <----------------------------------------
+    1, //bDelay //задержка, вносимая устройством (в единицах числа фреймов)
+    USB_U16( USBAUDIO_FORMAT_PCM ), //wFormatTag=PCM, тип кодирования данных //TODO описать возможные типы
+  )
+  ARRLEN1(//AS Format Type 1
+    bLENGTH, //bLength
+    USB_DESCR_CS_INTERFACE, //bDescriptorType
+    USBAUDIO_AS_FORMAT, //bDescriptorSubType
+    1, //bFormatType
+    1, //bNrChannels
+    2, //bSubFrameSize //количество БАЙТОВ на отсчет (1-4)
+    16, //bBitResolution //количество БИТОВ на отсчет (<= bSubFrameSize*8) //наверное, то-занимаемое в потоке место, а это - реальная разрешающая способность
+    1, //bSamFreqType //количество поддерживаемых частот
+    USB_AC24(F_SAMPLE), //tSamFreq //(6 байт!) массив диапазонов частот
+  )
+  ARRLEN1(//Endpoint descriptor
+    bLENGTH, //bLength
+    USB_DESCR_ENDPOINT, //bDescriptorType
+    ENDP_DATA_NUM, 
     USB_ENDP_ISO, //Isochronous / Synch=none / usage=data
     USB_U16(ENDP_DATA_SIZE),
     1, //bInterval - частота опроса, для изохронных всегда 1
@@ -229,8 +322,20 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
   }
 }
 
-char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){
+uint8_t interface[3] = {0,0,0};
 
+char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){
+  
+  return 0;
+}
+char usb_class_ep0_out(config_pack_t *req, uint16_t offset, uint16_t rx_size){
+  if(req->bmRequestType == 0x01){
+    if(req->bRequest == 0x0B){
+      interface[req->wIndex] = req->wValue;
+      usb_ep_write(0, NULL, 0);
+      return 1;
+    }
+  }
   return 0;
 }
 
@@ -245,41 +350,50 @@ int16_t dsin(uint8_t x){
 #define SAMPLE_COUNT ((F_SAMPLE / INTR_FREQ_HZ))
 #define RES_FREQ_HZ 1000
 
-volatile uint8_t count = 0;
-void data_callback(uint8_t epnum){
-  int16_t buf[ENDP_DATA_SIZE];
+void data_out_callback(uint8_t epnum){
+  int cnt;
+  int16_t buf[ENDP_DATA_SIZE/2];
+  cnt = usb_ep_read_double(ENDP_DATA_NUM, (void*)buf);
+  cnt /= 2;
+  GPO_OFF(GLED);
+  for(int i=0; i<cnt; i++){
+    if(buf[i] > 10000)GPO_ON(GLED);
+  }
+}
 
-  if(count > ENDP_DATA_SIZE/2){
-    count = ENDP_DATA_SIZE/2;
-    GPO_ON(RLED);
+volatile uint16_t count = 0;
+void data_in_callback(uint8_t epnum){
+  int16_t buf[ENDP_DATA_SIZE];
+  uint8_t txsize = count;
+
+  if(count > (ENDP_DATA_SIZE/2)){
+    txsize = (ENDP_DATA_SIZE/2);
   }
   
-  static int16_t cnt = 0;
-  for(uint8_t i=0; i<count; i++){
-#if 1
+  static int32_t cnt = 0;
+  for(uint8_t i=0; i<txsize; i++){
     buf[i] = dsin( (uint32_t)cnt * RES_FREQ_HZ * 256 / F_SAMPLE );
     cnt++;
     if(cnt >= F_SAMPLE)cnt -= F_SAMPLE;
-#else
-    static int8_t dir = 1;
-    buf[i] = cnt;
-    cnt += dir;
-    if(cnt > 32000)dir=-1; else if(cnt<-32000)dir=1;
-#endif
   }
-  usb_ep_write_double(ENDP_DATA_NUM, (void*)buf, count*2);
-  count = 0;
+  usb_ep_write_double(ENDP_IN_NUM, (void*)buf, txsize*2);
+
+  count -= txsize;
 }
 
 void TIM4_IRQHandler(){
   TIM4->SR = ~TIM_SR_UIF;
   
   count += SAMPLE_COUNT;
-
+  if(count > 0x8FFF){
+    GPO_ON(RLED);
+    count = 0;
+  }
 }
 
 void usb_class_init(){
-  usb_ep_init_double( ENDP_DATA_NUM | 0x80, USB_ENDP_ISO, ENDP_DATA_SIZE, data_callback);
+  usb_ep_init_double( ENDP_DATA_NUM, USB_ENDP_ISO, ENDP_DATA_SIZE, data_out_callback);
+  usb_ep_init_double( ENDP_IN_NUM | 0x80, USB_ENDP_ISO, ENDP_DATA_SIZE, data_in_callback);
   
   
   RCC->APB1ENR |= RCC_APB1ENR_TIM4EN; //F_APB1=32MHz

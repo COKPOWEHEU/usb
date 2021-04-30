@@ -194,7 +194,11 @@ void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
   if( dir_in ){
     usb_epdata[epnum].usb_tx_addr = lastaddr;
     epfunc_in[epnum] = func;
-    ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
+    if((ep_type & 0x03) == USB_ENDP_ISO){
+      ENDP_STAT_TX(epnum, USB_EP_TX_VALID);
+    }else{
+      ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
+    }
   }else{
     usb_epdata[epnum].usb_rx_addr = lastaddr;
     if(size < 64){

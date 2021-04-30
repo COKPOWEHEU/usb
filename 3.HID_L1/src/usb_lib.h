@@ -8,7 +8,7 @@
  *************************************************************************************
  */
 
-#define USB_EP0_BUFSZ   64
+#define USB_EP0_BUFSZ   8
 
 /*************************************************************************************
  *************************************************************************************
@@ -35,8 +35,11 @@ typedef struct{
 //usb_lib.c
 void USB_setup();
 void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func);
-void usb_ep_write(uint8_t epnum, const uint8_t *buf, uint16_t size);
-int usb_ep_read(uint8_t epnum, uint16_t *buf);
+void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func);
+static void usb_ep_write(uint8_t epnum, const uint8_t *buf, uint16_t size);
+static void usb_ep_write_double(uint8_t epnum, const uint8_t *buf, uint16_t size);
+static int usb_ep_read(uint8_t epnum, uint16_t *buf);
+static int usb_ep_read_double(uint8_t epnum, uint16_t *buf);
 #define usb_ep_ready(epnum)
 
 /*************************************************************************************
@@ -163,5 +166,23 @@ static const struct name{                        \
 
 #define bLENGTH 0
 #define wTOTALLENGTH 0,0
+
+void _usb_ep_write(uint8_t idx, const uint8_t *buf, uint16_t size);
+static inline void usb_ep_write(uint8_t epnum, const uint8_t *buf, uint16_t size){
+  _usb_ep_write((epnum & 0x0F)*2, buf, size);
+}
+static inline void usb_ep_write_double(uint8_t epnum, const uint8_t *buf, uint16_t size){
+  uint8_t idx = !(USB_EPx(epnum) & USB_EP_DTOG_TX);
+  _usb_ep_write((epnum & 0x0F)*2 + idx, buf, size);
+}
+
+int _usb_ep_read(uint8_t idx, uint16_t *buf);
+static inline int usb_ep_read(uint8_t epnum, uint16_t *buf){
+  return _usb_ep_read((epnum & 0x0F)*2 + 1, buf);
+}
+static inline int usb_ep_read_double(uint8_t epnum, uint16_t *buf){
+  uint8_t idx = !(USB_EPx(epnum) & USB_EP_DTOG_TX);
+  return _usb_ep_read((epnum & 0x0F)*2 + idx, buf);
+}
 
 #endif // __USB_LIB_H__

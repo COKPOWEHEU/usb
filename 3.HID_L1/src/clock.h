@@ -6,6 +6,10 @@
 // F_HSI ~ 16 MHz
 // F_LSI ~ 37 kHz
 
+#define F_APB1 32000000
+#define F_APB2 32000000
+#define F_CPU  32000000
+
 //system clock
 #define CLOCK_HSI 0
 #define CLOCK_HSE 1

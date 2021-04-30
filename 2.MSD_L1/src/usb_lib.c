@@ -28,11 +28,18 @@ __attribute__((weak))char usb_class_ep0_out(config_pack_t *req, uint16_t offset,
 
 typedef struct{
     volatile uint32_t usb_tx_addr;
-    volatile uint32_t usb_tx_count;
+    volatile union{
+      uint32_t usb_tx_count; //SINGLE mode, TX count
+      struct{                //DOUBLE mode, RX struct
+        uint32_t tx_count:10;
+        uint32_t tx_num_blocks:5;
+        uint32_t tx_blocksize:1;
+      };
+    };
     volatile uint32_t usb_rx_addr;
     volatile union{
-      uint32_t usb_rx_count;
-      struct{
+      uint32_t usb_rx_count; //DOUBLE mode, TX count
+      struct{                //SINGLE mode, RX struct
         uint32_t rx_count:10;
         uint32_t rx_num_blocks:5;
         uint32_t rx_blocksize:1;
@@ -187,7 +194,11 @@ void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
   if( dir_in ){
     usb_epdata[epnum].usb_tx_addr = lastaddr;
     epfunc_in[epnum] = func;
-    ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
+    if((ep_type & 0x03) == USB_ENDP_ISO){
+      ENDP_STAT_TX(epnum, USB_EP_TX_VALID);
+    }else{
+      ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
+    }
   }else{
     usb_epdata[epnum].usb_rx_addr = lastaddr;
     if(size < 64){
@@ -202,6 +213,51 @@ void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
     ENDP_STAT_RX(epnum, USB_EP_RX_VALID);
   }
   lastaddr += size;
+}
+
+void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
+  uint8_t dir_in = (epnum & 0x80);
+  epnum &= 0x0F;
+  
+  ENDP_STAT_TX(epnum, USB_EP_TX_DIS);
+  ENDP_STAT_RX(epnum, USB_EP_RX_DIS);
+  
+  uint16_t buf = USB_EPx(epnum);
+  buf = (buf & ~(USB_EP_DTOG_RX | USB_EP_DTOG_TX | USB_EPTX_STAT | USB_EPRX_STAT)) | USB_EP_CTR_RX | USB_EP_CTR_TX;
+  buf = (buf & ~USB_EPADDR_FIELD) | epnum;
+  
+  buf &=~ USB_EP_T_FIELD;
+  switch(ep_type){
+    case USB_ENDP_CTRL: buf |= USB_EP_CONTROL; break;
+    case USB_ENDP_BULK: buf |= USB_EP_BULK; break;
+    case USB_ENDP_INTR: buf |= USB_EP_INTERRUPT; break;
+    default: buf |= USB_EP_ISOCHRONOUS; //в дескрипторах изохронные точки могут иметь расширенные настройки
+  }
+  USB_EPx(epnum) = buf;
+  
+  if( dir_in ){
+    usb_epdata[epnum].usb_tx_addr = lastaddr;
+    usb_epdata[epnum].usb_rx_addr = lastaddr + size;
+    ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
+    ENDP_STAT_RX(epnum, USB_EP_RX_NAK);
+  }else{
+    usb_epdata[epnum].usb_rx_addr = lastaddr;
+    usb_epdata[epnum].usb_tx_addr = lastaddr + size;
+    if(size < 64){
+      usb_epdata[epnum].rx_blocksize = usb_epdata[epnum].tx_blocksize = 0;
+      usb_epdata[epnum].rx_num_blocks = usb_epdata[epnum].tx_num_blocks = size / 2;
+    }else{
+      usb_epdata[epnum].rx_blocksize = usb_epdata[epnum].tx_blocksize = 1;
+      if(size < 32)size = 32;
+      usb_epdata[epnum].rx_num_blocks = usb_epdata[epnum].tx_num_blocks = size / 32 - 1;
+    }
+    ENDP_STAT_RX(epnum, USB_EP_RX_VALID);
+    ENDP_STAT_TX(epnum, USB_EP_TX_VALID);
+  }
+  epfunc_in[epnum] = func;
+  epfunc_out[epnum]= func;
+    
+  lastaddr += 2*size;
 }
 
 // standard IRQ handler
@@ -246,30 +302,43 @@ void USB_LP_IRQHandler(){
   }
 }
 
-void usb_ep_write(uint8_t epnum, const uint8_t *buf, uint16_t size){
-  epnum &= 0x0F;
-  uint8_t i;
+
+typedef struct{
+  volatile uint32_t addr;
+  volatile union{
+    uint32_t count; //SINGLE mode, TX count
+    struct{         //DOUBLE mode, RX struct
+      uint32_t rx_count:10;
+      uint32_t rx_num_blocks:5;
+      uint32_t rx_blocksize:1;
+    };
+  };
+}pma_descr_t;
+
+void _usb_ep_write(uint8_t idx, const uint8_t *buf, uint16_t size){
+  pma_descr_t *descr = &((pma_descr_t*)usb_epdata)[idx];
   uint16_t N2 = (size + 1) >> 1;
   // the buffer is 16-bit, so we should copy data as it would be uint16_t
   uint16_t *buf16 = (uint16_t *)buf;
-  uint32_t *out = (uint32_t*)((uint16_t *)(USB_PMAADDR + usb_epdata[epnum].usb_tx_addr*2));
-  for(i = 0; i < N2; ++i, ++out){
+  uint32_t *out = (uint32_t*)((uint16_t *)(USB_PMAADDR + descr->addr*2));
+  for(uint16_t i = 0; i < N2; ++i, ++out){
     *out = buf16[i];
   }
-  usb_epdata[epnum].usb_tx_count = size;
+  descr->count = size;
   
-  ENDP_STAT_TX(epnum, USB_EP_TX_VALID);
+  ENDP_STAT_TX((idx/2), USB_EP_TX_VALID);
 }
 
-int usb_ep_read(uint8_t epnum, uint16_t *buf){
-  int sz = usb_epdata[epnum].rx_count;
+int _usb_ep_read(uint8_t idx, uint16_t *buf){
+  pma_descr_t *descr = &((pma_descr_t*)usb_epdata)[idx];
+  int sz = descr->rx_count;
   if(!sz) return 0;
   int n = (sz + 1) >> 1;
-  uint32_t *in = (uint32_t*)((uint16_t *)(USB_PMAADDR + usb_epdata[epnum].usb_rx_addr*2));
+  uint32_t *in = (uint32_t*)((uint16_t *)(USB_PMAADDR + descr->addr*2));
   for(int i = 0; i < n; ++i, ++in)
     buf[i] = *(uint16_t*)in;
   
-  ENDP_STAT_RX(epnum, USB_EP_RX_VALID);
+  ENDP_STAT_RX((idx/2), USB_EP_RX_VALID);
   return sz;
 }
 
