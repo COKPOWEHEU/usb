@@ -167,13 +167,18 @@ static const struct name{                        \
 #define bLENGTH 0
 #define wTOTALLENGTH 0,0
 
+#define ENDP_TOG(num, tog) do{USB_EPx(num) = ((USB_EPx(num) & ~(USB_EP_DTOG_RX | USB_EP_DTOG_TX | USB_EPRX_STAT | USB_EPTX_STAT)) | USB_EP_CTR_RX | USB_EP_CTR_TX) | tog; }while(0)
+
 void _usb_ep_write(uint8_t idx, const uint8_t *buf, uint16_t size);
 static inline void usb_ep_write(uint8_t epnum, const uint8_t *buf, uint16_t size){
   _usb_ep_write((epnum & 0x0F)*2, buf, size);
 }
 static inline void usb_ep_write_double(uint8_t epnum, const uint8_t *buf, uint16_t size){
-  uint8_t idx = !(USB_EPx(epnum) & USB_EP_DTOG_TX);
-  _usb_ep_write((epnum & 0x0F)*2 + idx, buf, size);
+  epnum &= 0x0F;
+  uint8_t idx = !!( USB_EPx(epnum) & USB_EP_DTOG_RX );
+  idx += 2*epnum;
+  ENDP_TOG( epnum, USB_EP_DTOG_RX );
+  _usb_ep_write(idx, buf, size);
 }
 
 int _usb_ep_read(uint8_t idx, uint16_t *buf);

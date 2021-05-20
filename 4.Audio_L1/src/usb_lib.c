@@ -229,17 +229,22 @@ void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t 
   buf &=~ USB_EP_T_FIELD;
   switch(ep_type){
     case USB_ENDP_CTRL: buf |= USB_EP_CONTROL; break;
-    case USB_ENDP_BULK: buf |= USB_EP_BULK; break;
+    case USB_ENDP_BULK: buf |= USB_EP_BULK | USB_EP_KIND; break;
     case USB_ENDP_INTR: buf |= USB_EP_INTERRUPT; break;
     default: buf |= USB_EP_ISOCHRONOUS; //в дескрипторах изохронные точки могут иметь расширенные настройки
   }
   USB_EPx(epnum) = buf;
   
+#define USB_EP_SWBUF_TX     USB_EP_DTOG_RX
+#define USB_EP_SWBUF_RX     USB_EP_DTOG_TX
   if( dir_in ){
     usb_epdata[epnum].usb_tx_addr = lastaddr;
+    usb_epdata[epnum].usb_tx_count = 0;
     usb_epdata[epnum].usb_rx_addr = lastaddr + size;
-    ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
-    ENDP_STAT_RX(epnum, USB_EP_RX_NAK);
+    usb_epdata[epnum].usb_rx_count = 0;
+    
+    buf = USB_EPx(epnum);
+    USB_EPx(epnum) = (buf ^ USB_EP_TX_VALID) & (USB_EPREG_MASK | USB_EPTX_STAT | USB_EP_DTOG_TX | USB_EP_SWBUF_TX);
   }else{
     usb_epdata[epnum].usb_rx_addr = lastaddr;
     usb_epdata[epnum].usb_tx_addr = lastaddr + size;
