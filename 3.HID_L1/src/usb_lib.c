@@ -26,6 +26,8 @@ __attribute__((weak))void usb_class_poll(){}
 __attribute__((weak))char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){return 0;}
 __attribute__((weak))char usb_class_ep0_out(config_pack_t *req, uint16_t offset, uint16_t rx_size){return 0;}
 
+static void endp_callback_default(uint8_t epnum){}
+
 typedef struct{
     volatile uint32_t usb_tx_addr;
     volatile union{
@@ -54,9 +56,15 @@ static config_pack_t setup_packet;
 
 void USB_setup(){
   RCC->APB1ENR |= RCC_APB1ENR_USBEN;
+#ifdef SYSCFG_PMC_USB_PU
   RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-  
   SYSCFG->PMC &=~ SYSCFG_PMC_USB_PU;
+#elif defined USB_PULLUP
+  GPIO_config( USB_PULLUP );
+  GPO_OFF( USB_PULLUP );
+#else
+  #warning USB_PULLUP undefined
+#endif
   USB->CNTR   = USB_CNTR_FRES; // Force USB Reset
   for(uint32_t ctr = 0; ctr < 100000; ++ctr) asm volatile("nop"); // wait >1ms
   USB->CNTR   = 0;
@@ -65,7 +73,11 @@ void USB_setup(){
   USB->ISTR   = 0;
   USB->CNTR   = USB_CNTR_RESETM | USB_CNTR_WKUPM;
   NVIC_EnableIRQ(USB_LP_IRQn);
+#ifdef SYSCFG_PMC_USB_PU
   SYSCFG->PMC |= SYSCFG_PMC_USB_PU;
+#elif defined USB_PULLUP
+  GPO_ON( USB_PULLUP );
+#endif
 }
 
 static uint8_t USB_Addr = 0;
@@ -169,6 +181,7 @@ static void ep0_out(uint8_t epnum){
 
 static uint16_t lastaddr = LASTADDR_DEFAULT;
 void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
+  if(func == NULL)func = endp_callback_default;
   uint8_t dir_in = (epnum & 0x80);
   epnum &= 0x0F;
   
@@ -216,6 +229,7 @@ void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
 }
 
 void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
+  if(func == NULL)func = endp_callback_default;
   uint8_t dir_in = (epnum & 0x80);
   epnum &= 0x0F;
   

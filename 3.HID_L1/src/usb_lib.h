@@ -151,7 +151,7 @@ static const struct name{                        \
 #undef usb_ep_ready
 #define usb_ep_ready(epnum) (\
   (((epnum) & 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPTX_STAT) != USB_EP_TX_VALID) ) || \
-  (!((epnum)& 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPRX_STAT) != USB_EP_RX_VALID) ) \
+  (!((epnum)& 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPRX_STAT) == USB_EP_RX_NAK) ) \
   )
 
 

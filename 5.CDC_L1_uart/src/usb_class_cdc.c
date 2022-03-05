@@ -318,4 +318,8 @@ void usb_class_poll(){
       UART_write( USART, buf, len );
     }
   }
+  if(GPI_ON(LBTN)){
+    GPO_T(GLED);
+    usb_ep_write( ENDP_DATA_IN | 0x80, "AAA\r\n", 5);
+  }
 }

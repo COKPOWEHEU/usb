@@ -16,8 +16,10 @@ extern const uint8_t my_res_end[]     asm(FATSRC "_end");
 #define STD_DESCR_CONF 4
 #define STD_DESCR_IF   5
 
-#define USB_VID 0x16C0
-#define USB_PID 0x05DF
+#define USB_VID 0x0bda
+#define USB_PID 0x0129
+//#define USB_VID 0x16C0
+//#define USB_PID 0x05DF
 
 #define MSDCLASS_MSD          0x08
 #define MSDSUBCLASS_SCSI      0x06
@@ -149,7 +151,7 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
 #define USBCLASS_MSC_GET_MAX_LUN  0xFE
 #define USBCLASS_MSC_RESET        0xFF
 
-uint8_t maxlun = 1;
+uint8_t maxlun = 1; //15; //больше 2 (maxlun=1) последние винды не умеют
 
 uint8_t rambuf[1024*29];
 
@@ -164,6 +166,62 @@ struct{
   [1] = {
     .capacity = sizeof(rambuf),
     .buf = rambuf
+  },
+  [2] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [3] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [4] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [5] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [6] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [7] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [8] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [9] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [10] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [11] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [12] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [13] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [14] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },
+  [15] = {
+    .capacity = 0,
+    .buf = my_res_start,
   },
 };
 
@@ -326,6 +384,7 @@ void usb_class_init(){
   usb_ep_init(ENDP_NUM,        USB_EP_BULK, ENDP_SIZE, msc_ep1_out);
   usb_ep_init(ENDP_NUM | 0x80, USB_EP_BULK, ENDP_SIZE, msc_ep1_in);
   storage[0].capacity = (my_res_end - my_res_start);
+  for(int i=2;i<maxlun; i++)storage[i].capacity = storage[0].capacity;
   for(uint16_t i=0; i<512; i++){rambuf[i] = storage[0].buf[i];}
 }
 

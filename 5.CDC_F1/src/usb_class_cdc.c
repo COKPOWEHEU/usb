@@ -217,7 +217,7 @@ struct cdc_linecoding{
 }__attribute__((packed));
 
 volatile struct cdc_linecoding linecoding = {
-  .baudrate = 9600,
+  .baudrate = 0,
   .stopbits = 0,
   .parity = 0,
   .wordsize = 8,
@@ -308,7 +308,9 @@ void usb_class_poll(){
     usb_ep_write_double(ENDP_DATA_IN | 0x80, &ch, 1);
     GPO_T(RLED);
   }*/
-  test();
+  if(linecoding.baudrate > 0){
+    test();
+  }
   
   //GPO_T(RLED);
   sleep(5000000);

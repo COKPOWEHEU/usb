@@ -21,7 +21,7 @@ int main(void){
   __enable_irq();
   while (1){
     usb_class_poll();
-    sleep(100000);
+    //sleep(100000);
   }
   return 0;
 }
