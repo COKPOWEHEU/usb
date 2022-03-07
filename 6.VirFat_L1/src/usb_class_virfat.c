@@ -268,8 +268,7 @@ static void msc_ep1_out(uint8_t epnum){
     if(sect != cur_sect_addr){
       cur_sect_addr = sect;
     }
-    //sz = usb_ep_read(ENDP_NUM, (uint16_t*)&buffer[0]);
-    sz = usb_ep_read(ENDP_NUM, &cur_sect[offset]);
+    sz = usb_ep_read(ENDP_NUM, (uint16_t*)&cur_sect[offset]);
     offset += sz;
     cur_count += sz;
     if(offset >= 512){
@@ -436,7 +435,7 @@ void scsi_test_unit_ready(){
 }
 
 void scsi_read_capacity(){
-  uint8_t lun = msc_cbw.bLUN;
+  //uint8_t lun = msc_cbw.bLUN;
   //uint32_t last_lba = storage[lun].capacity / 512 - 1;
   uint32_t last_lba = virfat_getsize() - 1;
   
@@ -499,7 +498,7 @@ void scsi_write_10(){
   start_lba = (msc_cbw.CB[2] << 24) | (msc_cbw.CB[3] << 16) | (msc_cbw.CB[4] << 8) | (msc_cbw.CB[5] << 0);
   block_count = (msc_cbw.CB[7] << 8) | (msc_cbw.CB[8] << 0);
   
-  uint8_t lun = msc_cbw.bLUN;
+  //uint8_t lun = msc_cbw.bLUN;
   cur_count = 0;
   
 #ifdef VIRFAT_READONLY
@@ -517,7 +516,7 @@ void scsi_write_10(){
 }
 
 void scsi_mmc_read_fmt_cap(){
-  uint8_t lun = msc_cbw.bLUN;
+  //uint8_t lun = msc_cbw.bLUN;
   //uint32_t last_lba = storage[lun].capacity / 512 - 1;
   uint32_t last_lba = virfat_getsize() - 1;
   
