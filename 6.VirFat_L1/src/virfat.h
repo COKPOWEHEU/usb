@@ -1,13 +1,82 @@
 #ifndef __VIRFAT_H__
 #define __VIRFAT_H__
+#include <inttypes.h>
+
+#if 0==1
+//////////////////////////////////////////////////////////////
+//  User-defined settings, variables and callbacks of FAT ////
+//////////////////////////////////////////////////////////////
+#define VIRFAT_READONLY // (#define / not define)
+#define VIRFAT_DATE_DD_MM_YYYY	1, 3, 2022 //date of create / last access
+#define VIRFAT_TIME_HH_MM_SS	0, 0, 0 //time of create / last access
+#define VIRFAT_VOLID		0xFC561629 //disk UUID 
+#define VIRFAT_VOLNAME		"VIRTUAL_FAT" //disk Label (sometimes ignored by OS)
+
+//optional setings
+#define VIRFAT_JMPBOOT		{0xEB, 0x3C, 0x90} //I dont know why but this data is important...
+#define VIRFAT_OEMNAME		"virfat  " //FAT internal name of program created FS
+
+//sequence of files in Root directory
+static const virfat_file_t virfat_rootdir[] = {...};
+
+typedef struct{
+  char *name;					//file name (in DOS format, upper register, 8.3)
+  virfat_callback file_read;	//callback Host reading sector from Device
+  virfat_callback file_write;	//callback Host writing sector to Device
+  uint16_t addr_st;				//1st sector in FAT
+  uint16_t addr_en;				//(last+1)sector in FAT (based on file size)
+}virfat_file_t;
+
+//example function of reading file from USB storage (callback function):
+//  buf - buffer to read (1 sector = 512 bytes)
+//  addr - number of reading sector (0 ... )
+//  idx - file index (in virfat_rootdir array)
+void demo_log_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){ buf = data[addr*512]; }
+
+//example function of writing file to USB storage (callback function):
+//  buf - buffer to write (1 sector = 512 bytes)
+//  addr - number of writing sector (0 ... )
+//  idx - file index (in virfat_rootdir array)
+void demo_log_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){ data[arr*512] = buf; }
+
+//callback function to syncronize time by reading 'last access/write time)
+void virfat_time_callback(virfat_date_t *date, virfat_time_t *time){...}
+
+//last sector in storage
+#define VIRFAT_SECTOR_LAST (N)
+
+typedef struct virfat_date_t; - bit structure to encode/decode FAT date
+typedef struct virfat_time_t; - bit structure to encode/decode FAT time
+
+//////////////////////////////////////////////////////////////
+//  System function called by USB driver /////////////////////
+//////////////////////////////////////////////////////////////
+
+uint32_t virfat_getsize(); //storage size (in sectors)
+void virfat_read(uint8_t *buf, uint32_t addr); //read 1 sector by address (addr) from storate
+void virfat_write(uint8_t *buf, uint32_t addr);//write 1 sector by address (addr) to storage
+#endif
+
 
 //#define VIRFAT_READONLY
-#define VIRFAT_DATE_DD_MM_YYYY	1, 3, 2022
-#define VIRFAT_TIME_HH_MM_SS	0, 0, 0
-#define VIRFAT_JMPBOOT		{0xEB, 0x3C, 0x90}
-#define VIRFAT_OEMNAME		"virfat  "
-#define VIRFAT_VOLID		0xFC561629
-#define VIRFAT_VOLNAME		"VIRTUAL_FAT"
+#ifndef VIRFAT_DATE_DD_MM_YYYY
+  #define VIRFAT_DATE_DD_MM_YYYY	1, 3, 2022
+#endif
+#ifndef VIRFAT_TIME_HH_MM_SS
+  #define VIRFAT_TIME_HH_MM_SS	0, 0, 0
+#endif
+#ifndef VIRFAT_VOLID
+  #define VIRFAT_VOLID		0xFC561629
+#endif
+#ifndef VIRFAT_VOLNAME
+  #define VIRFAT_VOLNAME		"VIRTUAL_FAT"
+#endif
+#ifndef VIRFAT_JMPBOOT
+  #define VIRFAT_JMPBOOT		{0xEB, 0x3C, 0x90}
+#endif
+#ifndef VIRFAT_OEMNAME
+  #define VIRFAT_OEMNAME		"virfat  "
+#endif
 #define VIRFAT_FSNAME		"FAT16   "
 
 //////////////////////////////////////////////////////////////
@@ -95,9 +164,10 @@ void demo_log_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
 //////////////////////////////////////////////////////////////
 //  Dummy file read/write function
 //////////////////////////////////////////////////////////////
-void virfat_file_dummy(uint8_t *buf, uint32_t addr, uint16_t file_idx){
+void virfat_file_dummy_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
   for(uint16_t i=0; i<512; i++)buf[i] = 0;
 }
+void virfat_file_dummy_write(uint8_t *buf, uint32_t addr, uint16_t file_idx){}
 
 //////////////////////////////////////////////////////////////
 typedef void(*virfat_callback)(uint8_t *buf, uint32_t addr, uint16_t file_idx);
@@ -127,14 +197,14 @@ static const virfat_file_t virfat_rootdir[] = {
   {
     .name = "LOG     TXT",
     .file_read = demo_log_read,
-    .file_write = virfat_file_dummy,
+    .file_write = virfat_file_dummy_write,
     .addr_st = 2,
     .addr_en = 2 + DEMO_LOG_SIZE,
   },
   {
     .name = "DUMMY   TXT",
-    .file_read = virfat_file_dummy,
-    .file_write = virfat_file_dummy,
+    .file_read = virfat_file_dummy_read,
+    .file_write = virfat_file_dummy_write,
     .addr_st = 2 + DEMO_LOG_SIZE,
     .addr_en = 2 + DEMO_LOG_SIZE + 1,
   },
@@ -164,6 +234,8 @@ typedef struct{
   uint16_t min:6;
   uint16_t hour:5;
 }virfat_time_t;
+
+static inline void virfat_time_callback(virfat_date_t *date, virfat_time_t *time){}
 
 #pragma pack(push, 1)
 static const struct __attribute__((__packed__)){
@@ -356,6 +428,7 @@ static inline int _virfat_write_root(uint8_t *buf, uint32_t addr){
     if(i >= VIRFAT_FILES_TOTAL)return 1;
     virfat_cur_date = elem[0].acc_date;
     virfat_cur_time = elem[0].write_time;
+    virfat_time_callback((virfat_date_t*)&(elem[0].acc_date), (virfat_time_t*)&(elem[0].write_time));
     //TODO: set date-time callback
     //virfat_rootdir[j].addr = elem[0].cluster1_LO;
     i++;
@@ -378,20 +451,6 @@ static inline int _virfat_write_data(uint8_t *buf, uint32_t addr){
 }
 
 uint32_t virfat_getsize(){return VIRFAT_TOTSECT;}
-
-void virfat_init(){
-  /*for(uint16_t i=0; i<VIRFAT_FILES_TOTAL; i++){
-    virfat_rootdir[i].date = FAT_DATE( VIRFAT_DATE_DD_MM_YYYY );
-    virfat_rootdir[i].addr = i+2;
-    virfat_rootdir[i].sector[0] = i+'0';
-    virfat_rootdir[i].sector[1] = virfat_rootdir[i].addr + '0';
-    for(uint16_t j=2; j<512; j++)virfat_rootdir[i].sector[j] = (i % 10)+'A';
-  }
-  virfat_rootdir[0].name = "1AAAAAAATXT";
-  virfat_rootdir[1].name = "2FILE2  TXT";
-  virfat_rootdir[2].name = "3ANOTHERTXT";
-  */
-}
 
 void virfat_read(uint8_t *buf, uint32_t addr){
   if(_virfat_read_pbr( buf, addr) )return;
