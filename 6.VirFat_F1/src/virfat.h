@@ -2,6 +2,9 @@
 #define __VIRFAT_H__
 #include <inttypes.h>
 
+//TODO: example
+#define VIRFAT_VOLNAME		"VIRTUAL_FAT"
+
 #if 0==1
 //////////////////////////////////////////////////////////////
 //  User-defined settings, variables and callbacks of FAT ////
@@ -67,9 +70,6 @@ void virfat_write(uint8_t *buf, uint32_t addr);//write 1 sector by address (addr
 #endif
 #ifndef VIRFAT_VOLID
   #define VIRFAT_VOLID		0xFC561629
-#endif
-#ifndef VIRFAT_VOLNAME
-  #define VIRFAT_VOLNAME		"VIRTUAL_FAT"
 #endif
 #ifndef VIRFAT_JMPBOOT
   #define VIRFAT_JMPBOOT		{0xEB, 0x3C, 0x90}
@@ -205,7 +205,11 @@ static const virfat_file_t virfat_rootdir[] = {
 };
 
 #define VIRFAT_FILES_TOTAL	( sizeof(virfat_rootdir) / sizeof(virfat_file_t) )
-#define VIRFAT_ROOTENT (( VIRFAT_FILES_TOTAL + 15 ) &~ 15)
+#ifdef VIRFAT_VOLNAME
+  #define VIRFAT_ROOTENT (( VIRFAT_FILES_TOTAL + 15 + 1 ) &~ 15)
+#else
+  #define VIRFAT_ROOTENT (( VIRFAT_FILES_TOTAL + 15) &~ 15)
+#endif
 
 #define virfat_pbrstart 0
 #define virfat_fatstart 1
@@ -273,7 +277,11 @@ static const virfat_pbr_t virfat_pbr = {
   .NTErrFlag = 0, //?
   .BootSig = 0x29,//0, //?
   .VolID = VIRFAT_VOLID,
+#ifdef VIRFAT_VOLNAME
   .VolName = VIRFAT_VOLNAME,
+#else
+  .VolName = "___________",
+#endif
   .FSName = VIRFAT_FSNAME,
 };
 #pragma pack(pop)
@@ -354,6 +362,7 @@ static inline void _virfat_read_fat(uint8_t *buf, uint32_t addr){
     fat[0] = CLUST_BROKEN;
   }
 }
+
 static inline void _virfat_read_root(uint8_t *buf, uint32_t addr){
   uint16_t file_addr = 3;
   uint16_t i;
@@ -366,6 +375,22 @@ static inline void _virfat_read_root(uint8_t *buf, uint32_t addr){
   
   elem += i;
   uint16_t cnt = 0;
+  
+#ifdef VIRFAT_VOLNAME
+  if(i == 0){
+    for(uint16_t j=0; j<11; j++)elem[0].name[j] = VIRFAT_VOLNAME[j];
+    elem[0].dir_attr = VIRFAT_FLAG_VOLID;
+    elem[0].acc_date = elem[0].write_date = virfat_cur_date;
+    elem[0].write_time = virfat_cur_time;
+    elem[0].cluster1_HI = 0;
+    elem[0].cluster1_LO = 0;
+    elem[0].size = 0;
+    cnt++;
+    elem++;
+    i++;
+  }
+  i--;
+#endif
   
   for(; i<VIRFAT_FILES_TOTAL; i++, cnt++){
     if(cnt == 16)return;
