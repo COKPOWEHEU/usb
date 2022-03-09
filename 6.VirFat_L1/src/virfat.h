@@ -7,6 +7,7 @@
 //  User-defined settings, variables and callbacks of FAT ////
 //////////////////////////////////////////////////////////////
 #define VIRFAT_READONLY // (#define / not define)
+#define VIRFAT_TIME_CALLBACK // (#define / not define)
 #define VIRFAT_DATE_DD_MM_YYYY	1, 3, 2022 //date of create / last access
 #define VIRFAT_TIME_HH_MM_SS	0, 0, 0 //time of create / last access
 #define VIRFAT_VOLID		0xFC561629 //disk UUID 
@@ -39,7 +40,7 @@ void demo_log_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){ buf = data[a
 void demo_log_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){ data[arr*512] = buf; }
 
 //callback function to syncronize time by reading 'last access/write time)
-void virfat_time_callback(virfat_date_t *date, virfat_time_t *time){...}
+void virfat_time_callback(uint16_t date, uint16_t time){...}
 
 //last sector in storage
 #define VIRFAT_SECTOR_LAST (N)
@@ -226,8 +227,6 @@ typedef struct{
   uint16_t hour:5;
 }virfat_time_t;
 
-static inline void virfat_time_callback(virfat_date_t *date, virfat_time_t *time){}
-
 #pragma pack(push, 1)
 typedef struct __attribute__((__packed__)){
   uint8_t JmpBoot[3]; //ignore
@@ -377,6 +376,7 @@ static inline void _virfat_read_root(uint8_t *buf, uint32_t addr){
     
     elem[0].creae_date = FAT_DATE( VIRFAT_DATE_DD_MM_YYYY );
     elem[0].acc_date = elem[0].write_date = virfat_cur_date;
+    elem[0].write_time = virfat_cur_time;
     elem[0].cluster1_HI = 0;
     elem[0].size = (uint32_t)512 * virfat_rootdir[i].size;
     
@@ -413,29 +413,33 @@ static inline void _virfat_read_data(uint8_t *buf, uint32_t addr){
 /////////////////////////////////////////////////////
 /////// Write  //////////////////////////////////////
 /////////////////////////////////////////////////////
-static inline void _virfat_write_pbr(uint8_t *buf, uint32_t addr){
-}
-static inline void _virfat_write_fat (uint8_t *buf, uint32_t addr){
-}
+#define _virfat_write_pbr(buf,  addr)
+#define _virfat_write_fat(buf,  addr)
+//static uint16_t virfat_cur_date = FAT_DATE( VIRFAT_DATE_DD_MM_YYYY );
+//static uint16_t virfat_cur_time = FAT_TIME( VIRFAT_TIME_HH_MM_SS );
+#ifndef VIRFAT_TIME_CALLBACK
+  #define  _virfat_write_root(buf, addr)
+#else
 static inline void _virfat_write_root(uint8_t *buf, uint32_t addr){
-  /*uint16_t i;
+  uint16_t date, time, change_flag = 0;
   dir_elem *elem = (dir_elem*)buf;
-  
-  i = (addr - virfat_rootstart) * 16;
-  if(i >= VIRFAT_FILES_TOTAL)return 1; //these records are in 'root' dir but not emulated
-  elem += i;
-  
-  for(uint16_t j=0; j<16; j++){
-    if(i >= VIRFAT_FILES_TOTAL)return 1;
-    virfat_cur_date = elem[0].acc_date;
-    virfat_cur_time = elem[0].write_time;
-    virfat_time_callback((virfat_date_t*)&(elem[0].acc_date), (virfat_time_t*)&(elem[0].write_time));
-    //TODO: set date-time callback
-    //TODO: найти наиболее свежую пару time/date
-    i++;
-    elem++;
-  }*/
+  for(uint16_t i=0; i<16; i++){
+    if(elem[i].name[0] == 0)continue;
+    date = elem[0].acc_date;
+    if(elem[i].write_date > date)date = elem[i].write_date;
+    if(date >= virfat_cur_date){
+      if(date > virfat_cur_date)change_flag = 1;
+      virfat_cur_date = date;
+      time = elem[i].write_time;
+      if(time > virfat_cur_time){
+        virfat_cur_time = time;
+        change_flag = 1;
+      }
+    }
+  }
+  if(change_flag)virfat_time_callback(virfat_cur_date, virfat_cur_time);
 }
+#endif
 
 static inline void _virfat_write_data(uint8_t *buf, uint32_t addr){
   uint16_t file_addr = 1;
