@@ -300,6 +300,12 @@ typedef struct __attribute__((__packed__)) {
   uint32_t size;
 }dir_elem;
 #pragma pack(pop)
+#define VIRFAT_FLAG_RO		0x01
+#define VIRFAT_FLAG_HIDDEN	0x02
+#define VIRFAT_FLAG_SYSTEM	0x04
+#define VIRFAT_FLAG_VOLID	0x08
+#define VIRFAT_FLAG_DIR		0x10
+#define VIRFAT_FLAG_ARCHIVE	0x20
 
 uint32_t virfat_getsize();
 /////////////////////////////////////////////////////
@@ -365,15 +371,16 @@ static inline void _virfat_read_root(uint8_t *buf, uint32_t addr){
   for(; i<VIRFAT_FILES_TOTAL; i++, cnt++){
     if(cnt == 16)return;
     for(uint16_t j=0; j<sizeof(dir_elem); j++){ ((uint8_t*)elem)[j] = 0; }
-    elem[0].dir_attr = 0x20;
+    elem[0].dir_attr = VIRFAT_FLAG_ARCHIVE;
+    //if write operations does not supports -> mark file as read-only
+    if(virfat_rootdir[i].file_write == virfat_file_dummy)elem[0].dir_attr |= VIRFAT_FLAG_RO;
+    
     elem[0].creae_date = FAT_DATE( VIRFAT_DATE_DD_MM_YYYY );
     elem[0].acc_date = elem[0].write_date = virfat_cur_date;
     elem[0].cluster1_HI = 0;
-    //elem[0].size = (uint32_t)512*(virfat_rootdir[i].addr_en - virfat_rootdir[i].addr_st);
     elem[0].size = (uint32_t)512 * virfat_rootdir[i].size;
     
     for(uint16_t j=0; j<11; j++)elem[0].name[j] = virfat_rootdir[i].name[j];
-    //elem[0].cluster1_LO = virfat_rootdir[i].addr_st + 2;
     elem[0].cluster1_LO = file_addr;
     file_addr += virfat_rootdir[i].size;
     elem++;
