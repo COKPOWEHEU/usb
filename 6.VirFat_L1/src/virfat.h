@@ -23,8 +23,7 @@ typedef struct{
   char *name;					//file name (in DOS format, upper register, 8.3)
   virfat_callback file_read;	//callback Host reading sector from Device
   virfat_callback file_write;	//callback Host writing sector to Device
-  uint16_t addr_st;				//1st sector in FAT
-  uint16_t addr_en;				//(last+1)sector in FAT (based on file size)
+  uint16_t size;				//file size
 }virfat_file_t;
 
 //example function of reading file from USB storage (callback function):
@@ -123,11 +122,11 @@ const struct demolog_data_t demo_log[DEMO_DATASIZE] = {
   [500] = {500, 500},
   [999] = {999, 999},
 };
-#define DEMO_HEADLEN 32
-const char demo_head[ DEMO_HEADLEN ] = "Some header string\r\nx\t\t\ty\t\t\tz\r\n";
+
+const char demo_head[] = "Some header string\r\nx\t\t\ty\t\t\tz\r\n";
 #define DEMO_DATALEN	(12*3 + 1) //37
 #define DEMO_LINESINSEC	(512 / DEMO_DATALEN) //13
-#define DEMO_LINESINHEAD (DEMO_HEADLEN / DEMO_DATALEN) //(sizeof(demo_head) / DEMO_DATALEN)
+#define DEMO_LINESINHEAD (sizeof(demo_head) / DEMO_DATALEN)
 
 void demo_log_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
   uint16_t pos = 0;
@@ -164,10 +163,9 @@ void demo_log_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
 //////////////////////////////////////////////////////////////
 //  Dummy file read/write function
 //////////////////////////////////////////////////////////////
-void virfat_file_dummy_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
-  for(uint16_t i=0; i<512; i++)buf[i] = 0;
+void virfat_file_dummy(uint8_t *buf, uint32_t addr, uint16_t file_idx){
+  for(uint16_t i=0; i<512; i++)buf[i] = ' ';
 }
-void virfat_file_dummy_write(uint8_t *buf, uint32_t addr, uint16_t file_idx){}
 
 //////////////////////////////////////////////////////////////
 typedef void(*virfat_callback)(uint8_t *buf, uint32_t addr, uint16_t file_idx);
@@ -175,8 +173,7 @@ typedef struct{
   char *name;
   virfat_callback file_read;
   virfat_callback file_write;
-  uint16_t addr_st;
-  uint16_t addr_en;
+  uint16_t size;
 }virfat_file_t;
 
 static const virfat_file_t virfat_rootdir[] = {
@@ -184,41 +181,35 @@ static const virfat_file_t virfat_rootdir[] = {
     .name = "RLED    TXT",
     .file_read = demo_led_read,
     .file_write = demo_led_write,
-    .addr_st = 0,
-    .addr_en = 1,
+    .size = 1,
   },
   {
     .name = "GLED    TXT",
     .file_read = demo_led_read,
     .file_write = demo_led_write,
-    .addr_st = 1,
-    .addr_en = 2,
+    .size = 1,
   },
   {
     .name = "LOG     TXT",
     .file_read = demo_log_read,
-    .file_write = virfat_file_dummy_write,
-    .addr_st = 2,
-    .addr_en = 2 + DEMO_LOG_SIZE,
+    .file_write = virfat_file_dummy,
+    .size = DEMO_LOG_SIZE,
   },
   {
     .name = "DUMMY   TXT",
-    .file_read = virfat_file_dummy_read,
-    .file_write = virfat_file_dummy_write,
-    .addr_st = 2 + DEMO_LOG_SIZE,
-    .addr_en = 2 + DEMO_LOG_SIZE + 1,
+    .file_read = virfat_file_dummy,
+    .file_write = virfat_file_dummy,
+    .size = 1,
   },
 };
-#define VIRFAT_SECTOR_LAST	(2 + DEMO_LOG_SIZE + 2)
 
 #define VIRFAT_FILES_TOTAL	( sizeof(virfat_rootdir) / sizeof(virfat_file_t) )
-#if (VIRFAT_SECTOR_LAST < 0x2000)
-  #define VIRFAT_TOTSECT 0x2000
-#else
-  #define VIRFAT_TOTSECT (((VIRFAT_SECTOR_LAST) + 511) &~ 511)
-#endif
 #define VIRFAT_ROOTENT (( VIRFAT_FILES_TOTAL + 15 ) &~ 15)
-#define VIRFAT_FAT_SIZE (VIRFAT_TOTSECT / 512 / 1 * 2)
+
+#define virfat_pbrstart 0
+#define virfat_fatstart 1
+static uint16_t virfat_rootstart;
+#define virfat_datastart (virfat_rootstart + (VIRFAT_ROOTENT / 16))
 
 #define _FAT_DATE(day, month, year) ( ((((year)-1980) & 127)<<9) | (((month)&15)<<5) | ((day) & 31) )
 #define FAT_DATE(x) _FAT_DATE(x)
@@ -238,7 +229,7 @@ typedef struct{
 static inline void virfat_time_callback(virfat_date_t *date, virfat_time_t *time){}
 
 #pragma pack(push, 1)
-static const struct __attribute__((__packed__)){
+typedef struct __attribute__((__packed__)){
   uint8_t JmpBoot[3]; //ignore
   uint8_t OEMname[8];
   uint16_t BytesPerSec; //512
@@ -263,7 +254,8 @@ static const struct __attribute__((__packed__)){
   //reserved[]
   //[0x01FE] = 0x55
   //[0x01FF] = 0xAA
-}virfat_pbr = {
+}virfat_pbr_t;
+static const virfat_pbr_t virfat_pbr = {
   .JmpBoot = VIRFAT_JMPBOOT,
   .OEMname = VIRFAT_OEMNAME,
   .BytesPerSec = 512,
@@ -271,9 +263,9 @@ static const struct __attribute__((__packed__)){
   .SecReserved = 1,
   .NumFats = 1,
   .RootEntCnt = VIRFAT_ROOTENT,
-  .TotSect = VIRFAT_TOTSECT,
+  //.TotSect = VIRFAT_TOTSECT,
   .DriveType = 0xF8,
-  .fatsize = VIRFAT_FAT_SIZE, //(TotSect / BytesPerSec / SecPerClust * 2)
+  //.fatsize = VIRFAT_FAT_SIZE, //(TotSect / BytesPerSec / SecPerClust * 2)
   .SecPerTrak = 0x0020, //?
   .NumHeads = 0x0040, //?
   .SecHidden = 0,
@@ -286,10 +278,6 @@ static const struct __attribute__((__packed__)){
   .FSName = VIRFAT_FSNAME,
 };
 #pragma pack(pop)
-
-#define VIRFAT_FAT_START	1
-#define VIRFAT_ROOT_START	(VIRFAT_FAT_START + VIRFAT_FAT_SIZE)
-#define VIRFAT_DATA_START	(VIRFAT_ROOT_START + VIRFAT_ROOTENT / 16)
 
 static uint16_t virfat_cur_date = FAT_DATE( VIRFAT_DATE_DD_MM_YYYY );
 static uint16_t virfat_cur_time = FAT_TIME( VIRFAT_TIME_HH_MM_SS );
@@ -313,73 +301,85 @@ typedef struct __attribute__((__packed__)) {
 }dir_elem;
 #pragma pack(pop)
 
+uint32_t virfat_getsize();
 /////////////////////////////////////////////////////
 /////// Read  ///////////////////////////////////////
 /////////////////////////////////////////////////////
-static inline int _virfat_read_pbr(uint8_t *buf, uint32_t addr){
-  if(addr >= 1)return 0;
+static inline void _virfat_read_pbr(uint8_t *buf, uint32_t addr){
   uint16_t i;
   for(i=0; i<sizeof(virfat_pbr); i++){
     buf[i] = ((uint8_t*)&virfat_pbr)[i];
   }
+  ((virfat_pbr_t*)buf)->TotSect = virfat_getsize();
+  ((virfat_pbr_t*)buf)->fatsize = (virfat_rootstart - virfat_fatstart);
   for(; i< 0x01FE; i++)buf[i] = 0;
   buf[0x01FE] = 0x55;
   buf[0x01FF] = 0xAA;
-  return 1;
 }
-static inline int _virfat_read_fat(uint8_t *buf, uint32_t addr){
-  if(addr < 1)return 0;
-  if(addr >= VIRFAT_ROOT_START)return 0;
+static inline void _virfat_read_fat(uint8_t *buf, uint32_t addr){
   uint16_t *fat = (uint16_t*)buf;
   uint16_t *fat_end = (uint16_t*)(buf + 512);
   uint16_t sec = (addr-1)*(512/2);
   if(addr == 1){
     fat[0] = 0xFFF8;
     fat[1] = 0xFFFF;
-    fat += 2;
-    sec += 2;
+    fat[2] = 0x0000;
+    fat += 3;
+    sec += 3;
   }
-  sec -=2;
-  for(; fat < fat_end; fat++, sec++){
-    if( sec >= virfat_rootdir[VIRFAT_FILES_TOTAL-1].addr_en){
-      fat[0] = CLUST_BROKEN;
-    }else{
-      for(uint16_t i=0; i<VIRFAT_FILES_TOTAL; i++){
-        if( sec <  virfat_rootdir[i].addr_st )continue;
-        if( sec >= virfat_rootdir[i].addr_en )continue;
-        if( sec == (virfat_rootdir[i].addr_en - 1) ){fat[0] = 0xFFFF; break;}
-        fat[0] = sec + 3;
-        break;
-      }
+  sec -=3; //3 sectors reserved
+  sec += 1; //file addressing from (start+1) to (end)
+  uint16_t next_file_addr = 0;
+  for(uint16_t i=0; i<VIRFAT_FILES_TOTAL; i++){
+    next_file_addr += virfat_rootdir[i].size;
+    for(;sec < next_file_addr; sec++){
+      fat[0] = sec + 3;
+      fat++;
+      if(fat == fat_end)return;
+    }
+    if( sec == next_file_addr){
+      sec++;
+      fat[0] = 0xFFFF;
+      fat++;
+      if(fat == fat_end)return;
     }
   }
-  return 1;
+  
+  for(;fat < fat_end; fat++){
+    fat[0] = CLUST_BROKEN;
+  }
 }
-static inline int _virfat_read_root(uint8_t *buf, uint32_t addr){
-  if(addr < VIRFAT_ROOT_START)return 0;
-  if(addr >= VIRFAT_DATA_START)return 0;
+static inline void _virfat_read_root(uint8_t *buf, uint32_t addr){
+  uint16_t file_addr = 3;
   uint16_t i;
   dir_elem *elem = (dir_elem*)buf;
   
-  i = (addr - VIRFAT_ROOT_START) * 16;
+  i = (addr - virfat_rootstart) * 16;
+  for(uint16_t j=0; j<i; j++){
+    file_addr += virfat_rootdir[j].size;
+  }
+  
   elem += i;
   uint16_t cnt = 0;
   
   for(; i<VIRFAT_FILES_TOTAL; i++, cnt++){
-    if(cnt == 16)return 1;
+    if(cnt == 16)return;
     for(uint16_t j=0; j<sizeof(dir_elem); j++){ ((uint8_t*)elem)[j] = 0; }
     elem[0].dir_attr = 0x20;
     elem[0].creae_date = FAT_DATE( VIRFAT_DATE_DD_MM_YYYY );
     elem[0].acc_date = elem[0].write_date = virfat_cur_date;
     elem[0].cluster1_HI = 0;
-    elem[0].size = (uint32_t)512*(virfat_rootdir[i].addr_en - virfat_rootdir[i].addr_st);
+    //elem[0].size = (uint32_t)512*(virfat_rootdir[i].addr_en - virfat_rootdir[i].addr_st);
+    elem[0].size = (uint32_t)512 * virfat_rootdir[i].size;
     
     for(uint16_t j=0; j<11; j++)elem[0].name[j] = virfat_rootdir[i].name[j];
-    elem[0].cluster1_LO = virfat_rootdir[i].addr_st + 2;
+    //elem[0].cluster1_LO = virfat_rootdir[i].addr_st + 2;
+    elem[0].cluster1_LO = file_addr;
+    file_addr += virfat_rootdir[i].size;
     elem++;
   }
   for(; i<VIRFAT_ROOTENT; i++, cnt++){
-    if(cnt == 16)return 1;
+    if(cnt == 16)return;
     for(uint16_t j=0; j<sizeof(dir_elem); j++){ ((uint8_t*)elem)[j] = 0; }
     for(uint16_t j=0; j<11; j++)elem[0].name[j] = 0;
     elem[0].cluster1_HI = 0xFFFF;
@@ -387,40 +387,34 @@ static inline int _virfat_read_root(uint8_t *buf, uint32_t addr){
     elem[0].size = 0;
     elem++;
   }
-  return 1;
 }
-
-static inline int _virfat_read_data(uint8_t *buf, uint32_t addr){
-  if(addr < VIRFAT_DATA_START)return 0;
-  
-  addr = (addr - VIRFAT_DATA_START);
+static inline void _virfat_read_data(uint8_t *buf, uint32_t addr){
+  uint16_t file_addr = 1;
+  addr = (addr - virfat_datastart);
   for(uint16_t j=0; j<VIRFAT_FILES_TOTAL; j++){
-    if( (addr >= virfat_rootdir[j].addr_st) && (addr < virfat_rootdir[j].addr_en) ){
-      virfat_rootdir[j].file_read(buf, addr - virfat_rootdir[j].addr_st, j);
-      return 1;
+    if( (addr >= file_addr) && (addr < (file_addr + virfat_rootdir[j].size)) ){
+      virfat_rootdir[j].file_read(buf, addr - file_addr, j);
+      return;
     }
+    file_addr += virfat_rootdir[j].size;
   }
-  //any data outside the calculated area are 'broken'. The Host can't change them
   for(uint16_t i=0; i<512; i++){
     *(buf++) = 0xFF;
   }
-  return 1;
 }
+
 /////////////////////////////////////////////////////
 /////// Write  //////////////////////////////////////
 /////////////////////////////////////////////////////
-static inline int _virfat_write_fat (uint8_t *buf, uint32_t addr){
-  if(addr < 2)return 0;
-  if(addr >= VIRFAT_ROOT_START)return 0;
-  return 1;
+static inline void _virfat_write_pbr(uint8_t *buf, uint32_t addr){
 }
-static inline int _virfat_write_root(uint8_t *buf, uint32_t addr){
-  if(addr < VIRFAT_ROOT_START)return 0;
-  if(addr >= VIRFAT_DATA_START)return 0;
-  uint16_t i;
+static inline void _virfat_write_fat (uint8_t *buf, uint32_t addr){
+}
+static inline void _virfat_write_root(uint8_t *buf, uint32_t addr){
+  /*uint16_t i;
   dir_elem *elem = (dir_elem*)buf;
   
-  i = (addr - VIRFAT_ROOT_START) * 16;
+  i = (addr - virfat_rootstart) * 16;
   if(i >= VIRFAT_FILES_TOTAL)return 1; //these records are in 'root' dir but not emulated
   elem += i;
   
@@ -430,42 +424,57 @@ static inline int _virfat_write_root(uint8_t *buf, uint32_t addr){
     virfat_cur_time = elem[0].write_time;
     virfat_time_callback((virfat_date_t*)&(elem[0].acc_date), (virfat_time_t*)&(elem[0].write_time));
     //TODO: set date-time callback
-    //virfat_rootdir[j].addr = elem[0].cluster1_LO;
+    //TODO: найти наиболее свежую пару time/date
     i++;
     elem++;
-  }
-  return 1;
-}
-static inline int _virfat_write_data(uint8_t *buf, uint32_t addr){
-  if(addr < VIRFAT_DATA_START)return 0;
-  if(addr < VIRFAT_DATA_START)return 0;
-  
-  addr = (addr - VIRFAT_DATA_START);
-  for(uint16_t j=0; j<VIRFAT_FILES_TOTAL; j++){
-    if( (addr >= virfat_rootdir[j].addr_st) && (addr < virfat_rootdir[j].addr_en) ){
-      virfat_rootdir[j].file_write(buf, addr - virfat_rootdir[j].addr_st, j);
-      return 1;
-    }
-  }
-  return 1;
+  }*/
 }
 
-uint32_t virfat_getsize(){return VIRFAT_TOTSECT;}
+static inline void _virfat_write_data(uint8_t *buf, uint32_t addr){
+  uint16_t file_addr = 1;
+  addr = (addr - virfat_datastart);
+  for(uint16_t j=0; j<VIRFAT_FILES_TOTAL; j++){
+    if( (addr >= file_addr) && (addr < (file_addr + virfat_rootdir[j].size)) ){
+      virfat_rootdir[j].file_write(buf, addr - file_addr, j);
+      return;
+    }
+    file_addr += virfat_rootdir[j].size;
+  }
+}
+
+void virfat_init(){
+  uint32_t sectotal = 0;
+  for(uint16_t i=0; i<VIRFAT_FILES_TOTAL; i++){
+    sectotal += virfat_rootdir[i].size;
+  }
+  if(sectotal < 0x2000)sectotal = 0x2000;
+  virfat_rootstart = virfat_fatstart + ((sectotal * 2 + 511) / 512);
+}
+
+uint32_t virfat_getsize(){return 512UL*(virfat_rootstart-virfat_fatstart)/2;}
 
 void virfat_read(uint8_t *buf, uint32_t addr){
-  if(_virfat_read_pbr( buf, addr) )return;
-  if(_virfat_read_fat( buf, addr) )return;
-  if(_virfat_read_root(buf, addr) )return;
-  if(_virfat_read_data(buf, addr) )return;
+  if(addr < virfat_fatstart){
+    _virfat_read_pbr( buf, addr);
+  }else if(addr < virfat_rootstart){
+    _virfat_read_fat( buf, addr);
+  }else if(addr < virfat_datastart){
+    _virfat_read_root(buf, addr);
+  }else{
+    _virfat_read_data(buf, addr);
+  }
 }
 
 void virfat_write(uint8_t *buf, uint32_t addr){
-  if(_virfat_write_fat (buf, addr) )return;
-  if(_virfat_write_root(buf, addr) )return;
-  if(_virfat_write_data(buf, addr) )return;
+  if(addr < virfat_fatstart){
+    _virfat_write_pbr( buf, addr);
+  }else if(addr < virfat_rootstart){
+    _virfat_write_fat( buf, addr);
+  }else if(addr < virfat_datastart){
+    _virfat_write_root(buf, addr);
+  }else{
+    _virfat_write_data(buf, addr);
+  }
 }
-
-//uint32_t cur_sect_addr = 0;
-//uint8_t cur_sect[512];
 
 #endif
