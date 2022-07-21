@@ -471,11 +471,6 @@ void scsi_mode_sense_6(){
     buffer[2] = 0; //error
   }*/
   buffer[3] = 0;
-  buffer[4] = 0;
-  buffer[5] = 0;
-  buffer[6] = 0;
-  buffer[7] = 0;
-  buffer[8] = 0;
   bytestowrite = 4;
   msc_csw.dDataResidue = msc_cbw.dDataLength-4;
 }
@@ -502,9 +497,10 @@ void scsi_write_10(){
   cur_count = 0;
   
 #ifdef VIRFAT_READONLY
-    msc_sense.key = CSW_STATUS_FAILED;
-    msc_sense.asc = SBC_SENSE_KEY_NOT_READY;
-    msc_sense.ascq =SBC_ASC_WRITE_PROTECTED;
+    msc_csw.bStatus = CSW_STATUS_FAILED;
+    msc_sense.key = SBC_SENSE_KEY_MEDIUM_ERROR;
+    msc_sense.asc = SBC_ASC_WRITE_PROTECTED;
+    msc_sense.ascq =SBC_ASCQ_NA;
     return;
 #endif
   
@@ -518,10 +514,10 @@ void scsi_write_10(){
 void scsi_mmc_read_fmt_cap(){
   //uint8_t lun = msc_cbw.bLUN;
   //uint32_t last_lba = storage[lun].capacity / 512 - 1;
-  uint32_t last_lba = virfat_getsize() - 1;
+  uint32_t last_lba = virfat_getsize();
   
   buffer[0] = buffer[1] = buffer[2] = 0; //reserved
-  buffer[3] = //size
+  buffer[3] = 8;//size
   
   buffer[4] = (last_lba >> 24) & 0xFF;
   buffer[5] = (last_lba >> 16) & 0xFF;

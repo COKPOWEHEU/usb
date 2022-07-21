@@ -151,7 +151,7 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
 #define USBCLASS_MSC_GET_MAX_LUN  0xFE
 #define USBCLASS_MSC_RESET        0xFF
 
-uint8_t maxlun = 1; //15; //больше 2 (maxlun=1) последние винды не умеют
+uint8_t maxlun = 15; //15; //больше 2 (maxlun=1) последние винды не умеют
 
 uint8_t rambuf[1024*29];
 
@@ -163,6 +163,10 @@ struct{
     .capacity = 0,
     .buf = my_res_start,
   },
+  /*[1] = {
+    .capacity = 0,
+    .buf = my_res_start,
+  },*/
   [1] = {
     .capacity = sizeof(rambuf),
     .buf = rambuf
@@ -237,46 +241,46 @@ char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){
 }
 
 
-#define CSW_STATUS_SUCCESS			0
-#define CSW_STATUS_FAILED			1
+#define CSW_STATUS_SUCCESS		0
+#define CSW_STATUS_FAILED		1
 #define CSW_STATUS_PHASE_ERROR		2
 // The sense codes
 enum sbc_sense_key {
-	SBC_SENSE_KEY_NO_SENSE			= 0x00,
+	SBC_SENSE_KEY_NO_SENSE		= 0x00,
 	SBC_SENSE_KEY_RECOVERED_ERROR	= 0x01,
-	SBC_SENSE_KEY_NOT_READY			= 0x02,
-	SBC_SENSE_KEY_MEDIUM_ERROR		= 0x03,
+	SBC_SENSE_KEY_NOT_READY		= 0x02,
+	SBC_SENSE_KEY_MEDIUM_ERROR	= 0x03,
 	SBC_SENSE_KEY_HARDWARE_ERROR	= 0x04,
 	SBC_SENSE_KEY_ILLEGAL_REQUEST	= 0x05,
 	SBC_SENSE_KEY_UNIT_ATTENTION	= 0x06,
-	SBC_SENSE_KEY_DATA_PROTECT		= 0x07,
-	SBC_SENSE_KEY_BLANK_CHECK		= 0x08,
+	SBC_SENSE_KEY_DATA_PROTECT	= 0x07,
+	SBC_SENSE_KEY_BLANK_CHECK	= 0x08,
 	SBC_SENSE_KEY_VENDOR_SPECIFIC	= 0x09,
-	SBC_SENSE_KEY_COPY_ABORTED		= 0x0A,
+	SBC_SENSE_KEY_COPY_ABORTED	= 0x0A,
 	SBC_SENSE_KEY_ABORTED_COMMAND	= 0x0B,
 	SBC_SENSE_KEY_VOLUME_OVERFLOW	= 0x0D,
-	SBC_SENSE_KEY_MISCOMPARE		= 0x0E
+	SBC_SENSE_KEY_MISCOMPARE	= 0x0E
 };
 
 enum sbc_asc {
 	SBC_ASC_NO_ADDITIONAL_SENSE_INFORMATION	= 0x00,
 	SBC_ASC_PERIPHERAL_DEVICE_WRITE_FAULT	= 0x03,
-	SBC_ASC_LOGICAL_UNIT_NOT_READY			= 0x04,
-	SBC_ASC_UNRECOVERED_READ_ERROR			= 0x11,
+	SBC_ASC_LOGICAL_UNIT_NOT_READY		= 0x04,
+	SBC_ASC_UNRECOVERED_READ_ERROR		= 0x11,
 	SBC_ASC_INVALID_COMMAND_OPERATION_CODE	= 0x20,
-	SBC_ASC_LBA_OUT_OF_RANGE				= 0x21,
-	SBC_ASC_INVALID_FIELD_IN_CDB			= 0x24,
-	SBC_ASC_WRITE_PROTECTED					= 0x27,
-	SBC_ASC_NOT_READY_TO_READY_CHANGE		= 0x28,
-	SBC_ASC_FORMAT_ERROR					= 0x31,
-	SBC_ASC_MEDIUM_NOT_PRESENT				= 0x3A
+	SBC_ASC_LBA_OUT_OF_RANGE		= 0x21,
+	SBC_ASC_INVALID_FIELD_IN_CDB		= 0x24,
+	SBC_ASC_WRITE_PROTECTED			= 0x27,
+	SBC_ASC_NOT_READY_TO_READY_CHANGE	= 0x28,
+	SBC_ASC_FORMAT_ERROR			= 0x31,
+	SBC_ASC_MEDIUM_NOT_PRESENT		= 0x3A
 };
 
 enum sbc_ascq {
-	SBC_ASCQ_NA								= 0x00,
-	SBC_ASCQ_FORMAT_COMMAND_FAILED			= 0x01,
+	SBC_ASCQ_NA				= 0x00,
+	SBC_ASCQ_FORMAT_COMMAND_FAILED		= 0x01,
 	SBC_ASCQ_INITIALIZING_COMMAND_REQUIRED	= 0x02,
-	SBC_ASCQ_OPERATION_IN_PROGRESS			= 0x07
+	SBC_ASCQ_OPERATION_IN_PROGRESS		= 0x07
 };
 
 struct usb_msc_cbw{
@@ -384,7 +388,7 @@ void usb_class_init(){
   usb_ep_init(ENDP_NUM,        USB_EP_BULK, ENDP_SIZE, msc_ep1_out);
   usb_ep_init(ENDP_NUM | 0x80, USB_EP_BULK, ENDP_SIZE, msc_ep1_in);
   storage[0].capacity = (my_res_end - my_res_start);
-  for(int i=2;i<maxlun; i++)storage[i].capacity = storage[0].capacity;
+  for(int i=2;i<=maxlun; i++)storage[i].capacity = storage[0].capacity;
   for(uint16_t i=0; i<512; i++){rambuf[i] = storage[0].buf[i];}
 }
 
@@ -393,19 +397,19 @@ void usb_class_init(){
 
 // Implemented SCSI Commands
 #define SCSI_TEST_UNIT_READY	0x00
-#define SCSI_REQUEST_SENSE		0x03
-#define SCSI_FORMAT_UNIT			0x04
-#define SCSI_READ_6					0x08
-#define SCSI_WRITE_6				0x0A
-#define SCSI_INQUIRY			0x12
-#define SCSI_MODE_SENSE_6			0x1A
-#define SCSI_SEND_DIAGNOSTIC		0x1D
-#define SCSI_READ_CAPACITY		0x25
-#define SCSI_READ_10			0x28
-#define SCSI_WRITE_10			0x2A
+#define SCSI_REQUEST_SENSE	0x03
+#define SCSI_FORMAT_UNIT	0x04
+#define SCSI_READ_6		0x08
+#define SCSI_WRITE_6		0x0A
+#define SCSI_INQUIRY		0x12
+#define SCSI_MODE_SENSE_6	0x1A
+#define SCSI_SEND_DIAGNOSTIC	0x1D
+#define SCSI_READ_CAPACITY	0x25
+#define SCSI_READ_10		0x28
+#define SCSI_WRITE_10		0x2A
 
-#define SCSI_MMC_START_STOP_UNIT      0x1B
-#define SCSI_MMC_PREVENT_ALLOW_REMOVAL 0x1E
+#define SCSI_MMC_START_STOP_UNIT	0x1B
+#define SCSI_MMC_PREVENT_ALLOW_REMOVAL	0x1E
 #define SCSI_MMC_READ_FORMAT_CAPACITY 0x23 //винда очень любит этот запрос, а коррекно обрабатывать ответ "не поддерживаю" не умеет
 
 typedef struct{
@@ -438,13 +442,13 @@ static const uint8_t inquiry_response[36] = {
 
 #define LENGTH_INQUIRY_PAGE00		 7
 const uint8_t  inquiry_page00_data[] = {//7						
-	0x00,		
-	0x00, 
-	0x00, 
-	(LENGTH_INQUIRY_PAGE00 - 4),
-	0x00, 
-	0x80, 
-	0x83 
+  0x00,		
+  0x00, 
+  0x00, 
+  (LENGTH_INQUIRY_PAGE00 - 4),
+  0x00, 
+  0x80, 
+  0x83 
 };  
 
 void scsi_inquiry(){
@@ -521,17 +525,12 @@ void scsi_read_capacity(){
 void scsi_mode_sense_6(){
   buffer[0] = 3;
   buffer[1] = 0;
-  if(msc_cbw.bLUN == 0){
+  if(msc_cbw.bLUN != 1){ //LUN1 = ram buffer, read-write. Other LUNs = rom buffer, read-only
     buffer[2] = (1<<7);
   }else{
     buffer[2] = 0;
   }
   buffer[3] = 0;
-  buffer[4] = 0;
-  buffer[5] = 0;
-  buffer[6] = 0;
-  buffer[7] = 0;
-  buffer[8] = 0;
   bytestowrite = 4;
   msc_csw.dDataResidue = msc_cbw.dDataLength-4;
 }
@@ -557,10 +556,11 @@ void scsi_write_10(){
   uint8_t lun = msc_cbw.bLUN;
   cur_count = 0;
   
-  if(lun==0){
-    msc_sense.key = CSW_STATUS_FAILED;
-    msc_sense.asc = SBC_SENSE_KEY_NOT_READY;
-    msc_sense.ascq =SBC_ASC_WRITE_PROTECTED;
+  if(lun != 1){
+    msc_csw.bStatus = CSW_STATUS_FAILED;
+    msc_sense.key = SBC_SENSE_KEY_MEDIUM_ERROR;
+    msc_sense.asc = SBC_ASC_WRITE_PROTECTED;
+    msc_sense.ascq =SBC_ASCQ_NA;
     return;
   }
   
@@ -572,23 +572,27 @@ void scsi_write_10(){
 }
 
 void scsi_mmc_read_fmt_cap(){
-  uint8_t lun = msc_cbw.bLUN;
-  uint32_t last_lba = storage[lun].capacity / 512 - 1;
+  //uint8_t lun = msc_cbw.bLUN;
   
   buffer[0] = buffer[1] = buffer[2] = 0; //reserved
-  buffer[3] = //size
-  
-  buffer[4] = (last_lba >> 24) & 0xFF;
-  buffer[5] = (last_lba >> 16) & 0xFF;
-  buffer[6] = (last_lba >>  8) & 0xFF;
-  buffer[7] = (last_lba >>  0) & 0xFF;
-  
-  buffer[8] = 0;
-  buffer[9] = 0;
-  buffer[10] = 2;
-  buffer[11] = 0;
-  
-  bytestowrite = 12;
+  buffer[3] = 8*(maxlun+1);//size
+
+  uint32_t lunsize;
+  uint32_t repsize = 4;
+  for(uint8_t i=0; i<=maxlun; i++){
+    lunsize = storage[i].capacity / 512;
+    buffer[repsize+0] = (lunsize >> 24) & 0xFF;
+    buffer[repsize+1] = (lunsize >> 16) & 0xFF;
+    buffer[repsize+2] = (lunsize >>  8) & 0xFF;
+    buffer[repsize+3] = (lunsize >>  0) & 0xFF;
+    buffer[repsize+4] = 0;
+    buffer[repsize+5] = 0; // \.
+    buffer[repsize+6] = 2; //  } Block length = 512 bytes
+    buffer[repsize+7] = 0; // /.
+    repsize += 8;
+    if(repsize >= sizeof(buffer)){repsize = sizeof(buffer); break;}
+  }
+  bytestowrite = repsize;
   
   msc_sense.key = SBC_SENSE_KEY_NO_SENSE;
   msc_sense.asc = SBC_ASC_NO_ADDITIONAL_SENSE_INFORMATION;
