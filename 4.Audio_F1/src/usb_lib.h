@@ -9,6 +9,8 @@
  */
 
 #define USB_EP0_BUFSZ   8
+//#define USBLIB_SOF_ENABLE
+
 
 /*************************************************************************************
  *************************************************************************************
@@ -64,6 +66,9 @@ void usb_class_disconnect();
 //usb_class_poll (optional)
 //Function called periodically from main()
 void usb_class_poll();
+//usb_class_sof (optional, enabled by USBLIB_SOF_ENABLE macro)
+//Function called periodically by USB SOF event (every 1 ms)
+void usb_class_sof();
 //usb_class_ep0_in (optional)
 //IN request of endpoint 0
 //  req - request
@@ -151,7 +156,7 @@ static const struct name{                        \
 #undef usb_ep_ready
 #define usb_ep_ready(epnum) (\
   (((epnum) & 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPTX_STAT) != USB_EP_TX_VALID) ) || \
-  (!((epnum)& 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPRX_STAT) != USB_EP_RX_VALID) ) \
+  (!((epnum)& 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPRX_STAT) == USB_EP_RX_NAK) ) \
   )
 
 
@@ -166,30 +171,7 @@ static const struct name{                        \
 
 #define bLENGTH 0
 #define wTOTALLENGTH 0,0
-#if 0
-#define ENDP_TOG(num, tog) do{USB_EPx(num) = ((USB_EPx(num) & ~(USB_EP_DTOG_RX | USB_EP_DTOG_TX | USB_EPRX_STAT | USB_EPTX_STAT)) | USB_EP_CTR_RX | USB_EP_CTR_TX) | tog; }while(0)
 
-void _usb_ep_write(uint8_t idx, const uint8_t *buf, uint16_t size);
-static inline void usb_ep_write(uint8_t epnum, const uint8_t *buf, uint16_t size){
-  _usb_ep_write((epnum & 0x0F)*2, buf, size);
-}
-static inline void usb_ep_write_double(uint8_t epnum, const uint8_t *buf, uint16_t size){
-  epnum &= 0x0F;
-  uint8_t idx = !!( USB_EPx(epnum) & USB_EP_DTOG_RX );
-  idx += 2*epnum;
-  ENDP_TOG( epnum, USB_EP_DTOG_RX );
-  _usb_ep_write(idx, buf, size);
-}
-
-int _usb_ep_read(uint8_t idx, uint16_t *buf);
-static inline int usb_ep_read(uint8_t epnum, uint16_t *buf){
-  return _usb_ep_read((epnum & 0x0F)*2 + 1, buf);
-}
-static inline int usb_ep_read_double(uint8_t epnum, uint16_t *buf){
-  uint8_t idx = !(USB_EPx(epnum) & USB_EP_DTOG_TX);
-  return _usb_ep_read((epnum & 0x0F)*2 + idx, buf);
-}
-#endif
 #define ENDP_TOG(num, tog) do{USB_EPx(num) = ((USB_EPx(num) & ~(USB_EP_DTOG_RX | USB_EP_DTOG_TX | USB_EPRX_STAT | USB_EPTX_STAT)) | USB_EP_CTR_RX | USB_EP_CTR_TX) | tog; }while(0)
 
 void _usb_ep_write(uint8_t idx, const uint8_t *buf, uint16_t size);

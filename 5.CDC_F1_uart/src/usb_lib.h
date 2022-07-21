@@ -9,6 +9,8 @@
  */
 
 #define USB_EP0_BUFSZ   8
+//#define USBLIB_SOF_ENABLE
+
 
 /*************************************************************************************
  *************************************************************************************
@@ -64,6 +66,9 @@ void usb_class_disconnect();
 //usb_class_poll (optional)
 //Function called periodically from main()
 void usb_class_poll();
+//usb_class_sof (optional, enabled by USBLIB_SOF_ENABLE macro)
+//Function called periodically by USB SOF event (every 1 ms)
+void usb_class_sof();
 //usb_class_ep0_in (optional)
 //IN request of endpoint 0
 //  req - request

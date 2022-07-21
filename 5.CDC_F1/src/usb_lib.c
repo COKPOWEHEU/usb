@@ -23,8 +23,11 @@
 __attribute__((weak))void usb_class_init(){}
 __attribute__((weak))void usb_class_disconnect(){}
 __attribute__((weak))void usb_class_poll(){}
+__attribute__((weak))void usb_class_sof(){}
 __attribute__((weak))char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){return 0;}
 __attribute__((weak))char usb_class_ep0_out(config_pack_t *req, uint16_t offset, uint16_t rx_size){return 0;}
+
+static void endp_callback_default(uint8_t epnum){}
 
 typedef struct{
     volatile uint32_t usb_tx_addr;
@@ -54,9 +57,15 @@ static config_pack_t setup_packet;
 
 void USB_setup(){
   RCC->APB1ENR |= RCC_APB1ENR_USBEN;
+#ifdef SYSCFG_PMC_USB_PU
+  RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+  SYSCFG->PMC &=~ SYSCFG_PMC_USB_PU;
+#elif defined USB_PULLUP
   GPIO_config( USB_PULLUP );
-
   GPO_OFF( USB_PULLUP );
+#else
+  #warning USB_PULLUP undefined
+#endif
   USB->CNTR   = USB_CNTR_FRES; // Force USB Reset
   for(uint32_t ctr = 0; ctr < 100000; ++ctr) asm volatile("nop"); // wait >1ms
   USB->CNTR   = 0;
@@ -65,7 +74,11 @@ void USB_setup(){
   USB->ISTR   = 0;
   USB->CNTR   = USB_CNTR_RESETM | USB_CNTR_WKUPM;
   NVIC_EnableIRQ(USB_LP_IRQn);
+#ifdef SYSCFG_PMC_USB_PU
+  SYSCFG->PMC |= SYSCFG_PMC_USB_PU;
+#elif defined USB_PULLUP
   GPO_ON( USB_PULLUP );
+#endif
 }
 
 static uint8_t USB_Addr = 0;
@@ -169,6 +182,7 @@ static void ep0_out(uint8_t epnum){
 
 static uint16_t lastaddr = LASTADDR_DEFAULT;
 void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
+  if(func == NULL)func = endp_callback_default;
   uint8_t dir_in = (epnum & 0x80);
   epnum &= 0x0F;
   
@@ -194,7 +208,11 @@ void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
   if( dir_in ){
     usb_epdata[epnum].usb_tx_addr = lastaddr;
     epfunc_in[epnum] = func;
-    ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
+    if((ep_type & 0x03) == USB_ENDP_ISO){
+      ENDP_STAT_TX(epnum, USB_EP_TX_VALID);
+    }else{
+      ENDP_STAT_TX(epnum, USB_EP_TX_NAK);
+    }
   }else{
     usb_epdata[epnum].usb_rx_addr = lastaddr;
     if(size < 64){
@@ -212,6 +230,7 @@ void usb_ep_init(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
 }
 
 void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t func){
+  if(func == NULL)func = endp_callback_default;
   uint8_t dir_in = (epnum & 0x80);
   epnum &= 0x0F;
   
@@ -263,9 +282,32 @@ void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t 
 
 // standard IRQ handler
 void USB_LP_IRQHandler(){
+  if(USB->ISTR & USB_ISTR_CTR){
+    uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
+    if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
+      epfunc_out[epnum](epnum);
+      ENDP_CTR_RX_CLR(epnum);
+    }
+    if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
+      epfunc_in[epnum](epnum | 0x80);
+      ENDP_CTR_TX_CLR(epnum);
+    }
+    return;
+  }
+  
+  if(USB->ISTR & USB_ISTR_SOF){
+    usb_class_sof();
+    USB->ISTR = (uint16_t)~USB_ISTR_SOF;
+    return;
+  }
+  
   if(USB->ISTR & USB_ISTR_RESET){
     usb_class_disconnect();
-    USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
+    #ifdef USBLIB_SOF_ENABLE
+      USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SOFM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
+    #else
+      USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
+    #endif
     lastaddr = LASTADDR_DEFAULT;
     USB->DADDR = USB_DADDR_EF;
     for(uint8_t i=0; i<STM32ENDPOINTS; i++){
@@ -277,18 +319,6 @@ void USB_LP_IRQHandler(){
     usb_ep_init(0x80, USB_ENDP_CTRL, USB_EP0_BUFSZ, ep0_in);
     ep0_buf = NULL;
     usb_class_init();
-  }
-  
-  if(USB->ISTR & USB_ISTR_CTR){
-    uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
-    if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
-      epfunc_out[epnum](epnum);
-      ENDP_CTR_RX_CLR(epnum);
-    }
-    if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
-      epfunc_in[epnum](epnum | 0x80);
-      ENDP_CTR_TX_CLR(epnum);
-    }
   }
   
   if(USB->ISTR & USB_ISTR_SUSP){ // suspend -> still no connection, may sleep
@@ -342,3 +372,4 @@ int _usb_ep_read(uint8_t idx, uint16_t *buf){
   ENDP_STAT_RX((idx/2), USB_EP_RX_VALID);
   return sz;
 }
+

@@ -9,6 +9,8 @@
  */
 
 #define USB_EP0_BUFSZ   8
+//#define USBLIB_SOF_ENABLE
+
 
 /*************************************************************************************
  *************************************************************************************
@@ -64,6 +66,9 @@ void usb_class_disconnect();
 //usb_class_poll (optional)
 //Function called periodically from main()
 void usb_class_poll();
+//usb_class_sof (optional, enabled by USBLIB_SOF_ENABLE macro)
+//Function called periodically by USB SOF event (every 1 ms)
+void usb_class_sof();
 //usb_class_ep0_in (optional)
 //IN request of endpoint 0
 //  req - request
@@ -151,7 +156,7 @@ static const struct name{                        \
 #undef usb_ep_ready
 #define usb_ep_ready(epnum) (\
   (((epnum) & 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPTX_STAT) != USB_EP_TX_VALID) ) || \
-  (!((epnum)& 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPRX_STAT) != USB_EP_RX_VALID) ) \
+  (!((epnum)& 0x80) && ((USB_EPx((epnum) & 0x0F) & USB_EPRX_STAT) == USB_EP_RX_NAK) ) \
   )
 
 
