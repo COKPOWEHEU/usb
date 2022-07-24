@@ -26,7 +26,7 @@
 void scsi_reset();
 void scsi_command();
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -45,7 +45,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -59,7 +59,7 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
   )
 };
 
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size
@@ -149,10 +149,10 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
 #define USBCLASS_MSC_GET_MAX_LUN  0xFE
 #define USBCLASS_MSC_RESET        0xFF
 
-uint8_t maxlun = 0;
+USB_ALIGN uint8_t maxlun = 0;
 
-uint32_t cur_sect_addr = 0xFFFFFFFF;
-uint8_t cur_sect[512];
+USB_ALIGN uint32_t cur_sect_addr = 0xFFFFFFFF;
+USB_ALIGN uint8_t cur_sect[512];
 
 char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){
   if(req->bRequest == USBCLASS_MSC_RESET){
@@ -234,18 +234,18 @@ struct usb_msc_sense{
 }__attribute__((packed));
 typedef struct usb_msc_sense usb_msc_sense_t;
 
-usb_msc_cbw_t msc_cbw;
+USB_ALIGN usb_msc_cbw_t msc_cbw;
 uint8_t msc_cbw_count = 0;
-usb_msc_csw_t msc_csw = {
+USB_ALIGN usb_msc_csw_t msc_csw = {
   .dSignature = 0x53425355, //волшебное чиселко
 };
 uint8_t msc_csw_count = 0;
-usb_msc_sense_t msc_sense = {0,0,0};
+USB_ALIGN usb_msc_sense_t msc_sense = {0,0,0};
 
 static uint32_t bytestowrite = 0;
 static uint32_t bytestoread = 0;
 static uint32_t bytescount = 0;
-static uint8_t buffer[MSC_MEDIA_PACKET];
+USB_ALIGN static uint8_t buffer[MSC_MEDIA_PACKET];
 
 uint32_t start_lba;
 uint16_t block_count;
@@ -287,7 +287,7 @@ static void msc_ep1_in(uint8_t epnum){
     uint32_t left = bytestowrite - bytescount;
     if(left > ENDP_SIZE)left = ENDP_SIZE;
     if(block_count == 0){
-      usb_ep_write(ENDP_NUM, &buffer[bytescount], left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)(&buffer[bytescount]), left);
     }else{
       //uint8_t lun = msc_cbw.bLUN;
       uint32_t sect = start_lba + bytescount / 512;
@@ -296,8 +296,7 @@ static void msc_ep1_in(uint8_t epnum){
         virfat_read(cur_sect, sect);
         cur_sect_addr = sect;
       }
-      usb_ep_write(ENDP_NUM, &cur_sect[offset], left);
-      //usb_ep_write(ENDP_NUM, &storage[lun].buf[start_lba*512 + bytescount], left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)(&cur_sect[offset]), left);
       cur_count += left;
     }
     bytescount += left;
@@ -305,7 +304,7 @@ static void msc_ep1_in(uint8_t epnum){
     int32_t left = sizeof(msc_csw) - msc_csw_count;
     if(left > 0){
       if(left > ENDP_SIZE)left = ENDP_SIZE;
-      usb_ep_write(ENDP_NUM, (uint8_t*)&(((uint8_t*)&msc_csw)[msc_csw_count]), left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)(&(((uint8_t*)&msc_csw)[msc_csw_count])), left);
       msc_csw_count += left;
     }else if(left == 0){
       msc_cbw_count = 0;
@@ -331,20 +330,20 @@ void usb_class_init(){
 
 // Implemented SCSI Commands
 #define SCSI_TEST_UNIT_READY	0x00
-#define SCSI_REQUEST_SENSE		0x03
-#define SCSI_FORMAT_UNIT			0x04
-#define SCSI_READ_6					0x08
-#define SCSI_WRITE_6				0x0A
-#define SCSI_INQUIRY			0x12
-#define SCSI_MODE_SENSE_6			0x1A
-#define SCSI_SEND_DIAGNOSTIC		0x1D
-#define SCSI_READ_CAPACITY		0x25
-#define SCSI_READ_10			0x28
-#define SCSI_WRITE_10			0x2A
+#define SCSI_REQUEST_SENSE	0x03
+#define SCSI_FORMAT_UNIT	0x04
+#define SCSI_READ_6		0x08
+#define SCSI_WRITE_6		0x0A
+#define SCSI_INQUIRY		0x12
+#define SCSI_MODE_SENSE_6	0x1A
+#define SCSI_SEND_DIAGNOSTIC	0x1D
+#define SCSI_READ_CAPACITY	0x25
+#define SCSI_READ_10		0x28
+#define SCSI_WRITE_10		0x2A
 
-#define SCSI_MMC_START_STOP_UNIT      0x1B
-#define SCSI_MMC_PREVENT_ALLOW_REMOVAL 0x1E
-#define SCSI_MMC_READ_FORMAT_CAPACITY 0x23 //винда очень любит этот запрос, а коррекно обрабатывать ответ "не поддерживаю" не умеет
+#define SCSI_MMC_START_STOP_UNIT	0x1B
+#define SCSI_MMC_PREVENT_ALLOW_REMOVAL	0x1E
+#define SCSI_MMC_READ_FORMAT_CAPACITY	0x23 //винда очень любит этот запрос, а коррекно обрабатывать ответ "не поддерживаю" не умеет
 
 typedef struct{
   uint8_t opcode;
@@ -359,7 +358,7 @@ inline void scsi_reset(){
   //TODO
 }
 
-static const uint8_t inquiry_response[36] = {
+USB_ALIGN static const uint8_t inquiry_response[36] = {
   0x00,	// Byte 0: Peripheral Qualifier = 0, Peripheral Device Type = 0
   0x80,	// Byte 1: RMB = 1, Reserved = 0
   0x04,	// Byte 2: Version = 0
@@ -375,7 +374,7 @@ static const uint8_t inquiry_response[36] = {
 };
 
 #define LENGTH_INQUIRY_PAGE00		 7
-const uint8_t  inquiry_page00_data[] = {//7						
+USB_ALIGN const uint8_t  inquiry_page00_data[] = {//7						
 	0x00,		
 	0x00, 
 	0x00, 
@@ -401,7 +400,7 @@ void scsi_inquiry(){
   msc_sense.ascq =SBC_ASCQ_NA;
 }
 
-static const uint8_t sense_response[18] = {
+USB_ALIGN static const uint8_t sense_response[18] = {
   0x70,	// Byte 0: VALID = 0, Response Code = 112
   0x00,	// Byte 1: Obsolete = 0
   0x00,	// Byte 2: Filemark = 0, EOM = 0, ILI = 0, Reserved = 0, Sense Key = 0
@@ -536,6 +535,35 @@ void scsi_mmc_read_fmt_cap(){
   msc_sense.ascq =SBC_ASCQ_NA;
 }
 
+void scsi_mmc_start_stop(){ //ох, что-то мне подсказывает, что лучше на это не полагаться...
+  //msc_cbw.CB[0] = opcode (0x1B)
+  //[1].b0 = IMMED - срочность ответа (0-по завершении, 1-немедленно)
+  //[2]-reserved
+  //[3](b0-b3) - power condition modifier
+  //[4]: b4-b7 - power condition:
+  //             0 (START_VALID) - использовать START + LOEJ
+  //             1 (ACTIVE) - нормальный режим
+  //             2 (IDLE) - сон
+  //             3 (STANDBY) - минимальное потребление
+  //             остальные - хз
+  //             0x0A (FORCE_IDLE)
+  //             0x0B (FORCE_STANDBY)
+  //     b2 - NO_FLUSH (0-flush, 1-do nothing)
+  //     b1 - LOEJ (0-do nothing, 1-eject)
+  //     b0 - start (хз)
+  //[5] = control(?)
+  unsigned int pwrcond = msc_cbw.CB[4] >> 4;
+  if(pwrcond == 0){
+    if(msc_cbw.CB[4] & (1<<1)){
+      //eject callback
+    }
+  }
+  if(!(msc_cbw.CB[4] & (1<<2))){
+    //flush callback
+  }
+  //return: CHECK_CONDITION + NOT_READY + LOGICAL UNIT NOT READY (или все ок, наверное)
+}
+
 void scsi_command(){
   msc_csw.dTag = msc_cbw.dTag;
   msc_csw.bStatus = CSW_STATUS_SUCCESS;
@@ -571,6 +599,8 @@ void scsi_command(){
       scsi_mmc_read_fmt_cap();
       break;
     case SCSI_MMC_START_STOP_UNIT:
+      scsi_mmc_start_stop();
+      break;
     case SCSI_MMC_PREVENT_ALLOW_REMOVAL:
       break;
     default:

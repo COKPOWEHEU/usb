@@ -1,3 +1,6 @@
+//24.07.2022: remove USB_Addr global variable; change usb types (u8->u16); add USB_ALIGN macro
+//21.07.2022: Add default EPn callback; change sub-interrupt order (EPn -> SOF -> other)
+
 #include <stdint.h>
 #include "usb_lib.h"
 #include "hardware.h"
@@ -23,6 +26,7 @@
 __attribute__((weak))void usb_class_init(){}
 __attribute__((weak))void usb_class_disconnect(){}
 __attribute__((weak))void usb_class_poll(){}
+__attribute__((weak))void usb_class_sof(){}
 __attribute__((weak))char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){return 0;}
 __attribute__((weak))char usb_class_ep0_out(config_pack_t *req, uint16_t offset, uint16_t rx_size){return 0;}
 
@@ -80,20 +84,14 @@ void USB_setup(){
 #endif
 }
 
-static uint8_t USB_Addr = 0;
 static const uint8_t *ep0_buf = NULL;
 static uint16_t ep0_count = 0;
 
 static void ep0_in(uint8_t epnum){
-  if( (USB->DADDR & USB_DADDR_ADD) != USB_Addr ){
-    USB->DADDR = USB_DADDR_EF | USB_Addr;
-  }
-  
-  if( (USB_EPx(0) & USB_EPTX_STAT) == USB_EP_TX_VALID )return;
   if(ep0_buf == NULL)return;
   uint16_t left = ep0_count;
   if(left > USB_EP0_BUFSZ)left = USB_EP0_BUFSZ;
-  usb_ep_write(0, ep0_buf, left);
+  usb_ep_write(0, (uint16_t*)ep0_buf, left);
   
   ep0_count -= left;
   ep0_buf += left;
@@ -103,9 +101,9 @@ static void ep0_in(uint8_t epnum){
   }
 }
 
-inline static void ep0_send(const uint8_t *buf, uint16_t size){
+inline static void ep0_send(const uint16_t *buf, uint16_t size){
   ep0_count = size;
-  ep0_buf = buf;
+  ep0_buf = (uint8_t*)buf;
   ep0_in(0x80);
 }
 
@@ -146,10 +144,10 @@ static void ep0_out(uint8_t epnum){
           return;
         }
         case GET_STATUS:
-          usb_ep_write(0, (uint8_t*)"\0", 2); // send status: Bus Powered
+          usb_ep_write(0, (uint16_t*)"\0", 2); // send status: Bus Powered
           return;
         case GET_CONFIGURATION:
-          usb_ep_write(0, &configuration, 1);
+          usb_ep_write(0, (uint16_t*)&configuration, 1);
           return;
       }
     }
@@ -162,8 +160,10 @@ static void ep0_out(uint8_t epnum){
     //---OUT---
     if(req == (USB_REQ_STANDARD | USB_REQ_DEVICE)){
       if(setup_packet.bRequest == SET_ADDRESS){
-        USB_Addr = setup_packet.wValue;
+        uint8_t USB_Addr = setup_packet.wValue;
         usb_ep_write(0, NULL, 0);
+        while( (USB_EPx(0) & USB_EPTX_STAT) == USB_EP_TX_VALID ){}
+        USB->DADDR = USB_DADDR_EF | USB_Addr;
         return;
       }else if(setup_packet.bRequest == SET_CONFIGURATION){
         configuration = setup_packet.wValue;
@@ -281,9 +281,32 @@ void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t 
 
 // standard IRQ handler
 void USB_LP_IRQHandler(){
+  if(USB->ISTR & USB_ISTR_CTR){
+    uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
+    if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
+      epfunc_out[epnum](epnum);
+      ENDP_CTR_RX_CLR(epnum);
+    }
+    if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
+      epfunc_in[epnum](epnum | 0x80);
+      ENDP_CTR_TX_CLR(epnum);
+    }
+    return;
+  }
+  
+  if(USB->ISTR & USB_ISTR_SOF){
+    usb_class_sof();
+    USB->ISTR = (uint16_t)~USB_ISTR_SOF;
+    return;
+  }
+  
   if(USB->ISTR & USB_ISTR_RESET){
     usb_class_disconnect();
-    USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
+    #ifdef USBLIB_SOF_ENABLE
+      USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SOFM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
+    #else
+      USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
+    #endif
     lastaddr = LASTADDR_DEFAULT;
     USB->DADDR = USB_DADDR_EF;
     for(uint8_t i=0; i<STM32ENDPOINTS; i++){
@@ -295,18 +318,6 @@ void USB_LP_IRQHandler(){
     usb_ep_init(0x80, USB_ENDP_CTRL, USB_EP0_BUFSZ, ep0_in);
     ep0_buf = NULL;
     usb_class_init();
-  }
-  
-  if(USB->ISTR & USB_ISTR_CTR){
-    uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
-    if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
-      epfunc_out[epnum](epnum);
-      ENDP_CTR_RX_CLR(epnum);
-    }
-    if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
-      epfunc_in[epnum](epnum | 0x80);
-      ENDP_CTR_TX_CLR(epnum);
-    }
   }
   
   if(USB->ISTR & USB_ISTR_SUSP){ // suspend -> still no connection, may sleep
@@ -334,12 +345,12 @@ typedef struct{
   };
 }pma_descr_t;
 
-void _usb_ep_write(uint8_t idx, const uint8_t *buf, uint16_t size){
+void _usb_ep_write(uint8_t idx, const uint16_t *buf, uint16_t size){
   pma_descr_t *descr = &((pma_descr_t*)usb_epdata)[idx];
   uint16_t N2 = (size + 1) >> 1;
   // the buffer is 16-bit, so we should copy data as it would be uint16_t
   uint16_t *buf16 = (uint16_t *)buf;
-  uint32_t *out = (uint32_t*)((uint16_t *)(USB_PMAADDR + descr->addr*2));
+  volatile uint32_t *out = (volatile uint32_t*)((uint16_t *)(USB_PMAADDR + descr->addr*2));
   for(uint16_t i = 0; i < N2; ++i, ++out){
     *out = buf16[i];
   }
@@ -353,7 +364,7 @@ int _usb_ep_read(uint8_t idx, uint16_t *buf){
   int sz = descr->rx_count;
   if(!sz) return 0;
   int n = (sz + 1) >> 1;
-  uint32_t *in = (uint32_t*)((uint16_t *)(USB_PMAADDR + descr->addr*2));
+  volatile uint32_t *in = (volatile uint32_t*)((uint16_t *)(USB_PMAADDR + descr->addr*2));
   for(int i = 0; i < n; ++i, ++in)
     buf[i] = *(uint16_t*)in;
   

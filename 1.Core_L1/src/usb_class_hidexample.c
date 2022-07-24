@@ -23,7 +23,7 @@
 #define HIDPROTOCOL_KEYBOARD  1
 #define HIDPROTOCOL_MOUSE     2
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -42,7 +42,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -56,12 +56,12 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
   )
 };
 
-struct dataexchange_t{
+USB_ALIGN struct dataexchange_t{
   uint8_t rled;
   uint8_t gled;
 }hid_data;
 
-static const uint8_t USB_HIDDescriptor[] = {
+USB_ALIGN static const uint8_t USB_HIDDescriptor[] = {
     0x06, 0x00, 0xff,                   // USAGE_PAGE (Generic Desktop)
     0x09, 0x01,                         // USAGE (Vendor Usage 1)
     0xa1, 0x01,                         // COLLECTION (Application)
@@ -74,7 +74,7 @@ static const uint8_t USB_HIDDescriptor[] = {
     0xc0                                // END_COLLECTION
 };
 
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size

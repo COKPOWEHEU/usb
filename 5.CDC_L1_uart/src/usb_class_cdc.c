@@ -26,7 +26,7 @@
 #define CDCPROTOCOL_UNDEF     0x00
 #define CDCPROTOCOL_VENDOR    0xFF
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -45,7 +45,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -59,9 +59,7 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
   )
 };
 
-#define F_SAMPLE 16000 //количество сэмплов в секунду
-
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size
@@ -197,11 +195,6 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
   }
 }
 
-static void sleep(uint32_t time){
-  while(time--)asm volatile("nop");
-}
-
-
 #define CDC_SEND_ENCAPSULATED 0x00
 #define CDC_GET_ENCAPSULATED  0x01
 #define CDC_SET_COMM_FEATURE  0x02
@@ -219,7 +212,7 @@ struct cdc_linecoding{
   uint8_t wordsize; //length of data word: 5,6,7,8 or 16 bits
 }__attribute__((packed));
 
-volatile struct cdc_linecoding linecoding = {
+USB_ALIGN volatile struct cdc_linecoding linecoding = {
   .baudrate = 9600,
   .stopbits = 0,
   .parity = 0,
@@ -241,7 +234,7 @@ char usb_class_ep0_out(config_pack_t *req, uint16_t offset, uint16_t rx_size){
   if( (req->bmRequestType & 0x7F) == (USB_REQ_CLASS | USB_REQ_INTERFACE) ){
     if( req->bRequest == CDC_SET_LINE_CODING ){
       if(rx_size == 0)return 1;
-      usb_ep_read(0, (void*)&linecoding);
+      usb_ep_read(0, (uint16_t*)&linecoding);
       UART_speed( USART, 32000000 / linecoding.baudrate );
       if(linecoding.baudrate == 57600)GPO_ON(GLED); else GPO_OFF(GLED);
       //stopbits
@@ -302,24 +295,24 @@ void usb_class_init(){
 }
 
 void usb_class_poll(){
-  char buf[ENDP_DATA_SIZE];
+  USB_ALIGN char buf[ENDP_DATA_SIZE];
   int len = UART_rx_count(USART);
   if( len > 0 ){
     if( usb_ep_ready( ENDP_DATA_IN | 0x80 ) ){
       if( len > ENDP_DATA_SIZE )len = ENDP_DATA_SIZE;
-      UART_read( USART, buf, len );
-      usb_ep_write( ENDP_DATA_IN | 0x80, buf, len );
+      UART_read( USART, (uint8_t*)buf, len );
+      usb_ep_write( ENDP_DATA_IN | 0x80, (uint16_t*)buf, len );
     }
   }
   
   if( UART_tx_count(USART) > (ENDP_DATA_SIZE + 10) ){
     if( usb_ep_ready( ENDP_DATA_OUT ) ){
-      len = usb_ep_read( ENDP_DATA_OUT, buf );
-      UART_write( USART, buf, len );
+      len = usb_ep_read( ENDP_DATA_OUT, (uint16_t*)buf );
+      UART_write( USART, (uint8_t*)buf, len );
     }
   }
   if(GPI_ON(LBTN)){
     GPO_T(GLED);
-    usb_ep_write( ENDP_DATA_IN | 0x80, "AAA\r\n", 5);
+    usb_ep_write( ENDP_DATA_IN | 0x80, (uint16_t*)"AAA\r\n", 5);
   }
 }

@@ -26,7 +26,7 @@
 void scsi_reset();
 void scsi_command();
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -45,7 +45,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -59,7 +59,7 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
   )
 };
 
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size
@@ -149,10 +149,10 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
 #define USBCLASS_MSC_GET_MAX_LUN  0xFE
 #define USBCLASS_MSC_RESET        0xFF
 
-uint8_t maxlun = 0;
+USB_ALIGN uint8_t maxlun = 0;
 
 uint32_t cur_sect_addr = 0xFFFFFFFF;
-uint8_t cur_sect[512];
+USB_ALIGN uint8_t cur_sect[512];
 
 char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){
   if(req->bRequest == USBCLASS_MSC_RESET){
@@ -234,18 +234,18 @@ struct usb_msc_sense{
 }__attribute__((packed));
 typedef struct usb_msc_sense usb_msc_sense_t;
 
-usb_msc_cbw_t msc_cbw;
+USB_ALIGN usb_msc_cbw_t msc_cbw;
 uint8_t msc_cbw_count = 0;
-usb_msc_csw_t msc_csw = {
+USB_ALIGN usb_msc_csw_t msc_csw = {
   .dSignature = 0x53425355, //волшебное чиселко
 };
 uint8_t msc_csw_count = 0;
-usb_msc_sense_t msc_sense = {0,0,0};
+USB_ALIGN usb_msc_sense_t msc_sense = {0,0,0};
 
 static uint32_t bytestowrite = 0;
 static uint32_t bytestoread = 0;
 static uint32_t bytescount = 0;
-static uint8_t buffer[MSC_MEDIA_PACKET];
+USB_ALIGN static uint8_t buffer[MSC_MEDIA_PACKET];
 
 uint32_t start_lba;
 uint16_t block_count;
@@ -287,7 +287,7 @@ static void msc_ep1_in(uint8_t epnum){
     uint32_t left = bytestowrite - bytescount;
     if(left > ENDP_SIZE)left = ENDP_SIZE;
     if(block_count == 0){
-      usb_ep_write(ENDP_NUM, &buffer[bytescount], left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)(&buffer[bytescount]), left);
     }else{
       //uint8_t lun = msc_cbw.bLUN;
       uint32_t sect = start_lba + bytescount / 512;
@@ -296,7 +296,7 @@ static void msc_ep1_in(uint8_t epnum){
         virfat_read(cur_sect, sect);
         cur_sect_addr = sect;
       }
-      usb_ep_write(ENDP_NUM, &cur_sect[offset], left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)(&cur_sect[offset]), left);
       //usb_ep_write(ENDP_NUM, &storage[lun].buf[start_lba*512 + bytescount], left);
       cur_count += left;
     }
@@ -305,7 +305,7 @@ static void msc_ep1_in(uint8_t epnum){
     int32_t left = sizeof(msc_csw) - msc_csw_count;
     if(left > 0){
       if(left > ENDP_SIZE)left = ENDP_SIZE;
-      usb_ep_write(ENDP_NUM, (uint8_t*)&(((uint8_t*)&msc_csw)[msc_csw_count]), left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)&(((uint8_t*)&msc_csw)[msc_csw_count]), left);
       msc_csw_count += left;
     }else if(left == 0){
       msc_cbw_count = 0;
@@ -359,7 +359,7 @@ inline void scsi_reset(){
   //TODO
 }
 
-static const uint8_t inquiry_response[36] = {
+USB_ALIGN static const uint8_t inquiry_response[36] = {
   0x00,	// Byte 0: Peripheral Qualifier = 0, Peripheral Device Type = 0
   0x80,	// Byte 1: RMB = 1, Reserved = 0
   0x04,	// Byte 2: Version = 0
@@ -375,7 +375,7 @@ static const uint8_t inquiry_response[36] = {
 };
 
 #define LENGTH_INQUIRY_PAGE00		 7
-const uint8_t  inquiry_page00_data[] = {//7						
+USB_ALIGN const uint8_t  inquiry_page00_data[] = {//7						
 	0x00,		
 	0x00, 
 	0x00, 
@@ -401,7 +401,7 @@ void scsi_inquiry(){
   msc_sense.ascq =SBC_ASCQ_NA;
 }
 
-static const uint8_t sense_response[18] = {
+USB_ALIGN static const uint8_t sense_response[18] = {
   0x70,	// Byte 0: VALID = 0, Response Code = 112
   0x00,	// Byte 1: Obsolete = 0
   0x00,	// Byte 2: Filemark = 0, EOM = 0, ILI = 0, Reserved = 0, Sense Key = 0
@@ -465,11 +465,6 @@ void scsi_mode_sense_6(){
 #else
   buffer[2] = 0;
 #endif
-  /*if(msc_cbw.bLUN == 0){
-    buffer[2] = (1<<7); //read-only?
-  }else{
-    buffer[2] = 0; //error
-  }*/
   buffer[3] = 0;
   bytestowrite = 4;
   msc_csw.dDataResidue = msc_cbw.dDataLength-4;

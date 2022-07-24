@@ -20,7 +20,7 @@
 #define HIDREQ_SET_REPORT     9
 
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -39,7 +39,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -53,7 +53,7 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
   )
 };
 
-static const uint8_t USB_HIDDescriptor[] = {
+USB_ALIGN static const uint8_t USB_HIDDescriptor[] = {
   //keyboard
   USAGE_PAGE( USAGEPAGE_GENERIC ),//0x05, 0x01,
   USAGE( USAGE_KEYBOARD ), // 0x09, 0x06,
@@ -109,7 +109,7 @@ static const uint8_t USB_HIDDescriptor[] = {
   )
 };
 
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size
@@ -248,7 +248,7 @@ struct{
   };
   uint8_t reserved;
   uint8_t keys[6];
-}__attribute__((packed)) report_kbd = {
+}USB_ALIGN __attribute__((packed)) report_kbd = {
   .report_id = 1,
   .modifiers = 0,
   .keys = {0,0,0,0,0,0},
@@ -266,7 +266,7 @@ struct{
   };
   uint16_t x;
   uint16_t y;
-}__attribute__((packed)) report_tablet = {
+}USB_ALIGN __attribute__((packed)) report_tablet = {
   .report_id = 2,
   .buttons = 0,
   .x = 1000,

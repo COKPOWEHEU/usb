@@ -16,7 +16,7 @@
 #define USB_PID 0x05DF
 
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -35,7 +35,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -51,7 +51,7 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
 
 #define F_SAMPLE 16000 //количество сэмплов в секунду
 
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size
@@ -322,7 +322,7 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
   }
 }
 
-uint8_t interface[3] = {0,0,0};
+USB_ALIGN uint8_t interface[3] = {0,0,0};
 
 char usb_class_ep0_in(config_pack_t *req, void **data, uint16_t *size){
   
@@ -352,8 +352,8 @@ int16_t dsin(uint8_t x){
 
 void data_out_callback(uint8_t epnum){
   int cnt;
-  int16_t buf[ENDP_DATA_SIZE/2];
-  cnt = usb_ep_read_double(ENDP_DATA_NUM, (void*)buf);
+  USB_ALIGN int16_t buf[ENDP_DATA_SIZE/2];
+  cnt = usb_ep_read_double(ENDP_DATA_NUM, (uint16_t*)buf);
   cnt /= 2;
   GPO_OFF(GLED);
   for(int i=0; i<cnt; i++){
@@ -363,7 +363,7 @@ void data_out_callback(uint8_t epnum){
 
 volatile uint16_t count = 0;
 void data_in_callback(uint8_t epnum){
-  int16_t buf[ENDP_DATA_SIZE];
+  USB_ALIGN int16_t buf[ENDP_DATA_SIZE];
   uint8_t txsize = count;
 
   if(count > (ENDP_DATA_SIZE/2)){
@@ -376,7 +376,7 @@ void data_in_callback(uint8_t epnum){
     cnt++;
     if(cnt >= F_SAMPLE)cnt -= F_SAMPLE;
   }
-  usb_ep_write_double(ENDP_IN_NUM, (void*)buf, txsize*2);
+  usb_ep_write_double(ENDP_IN_NUM, (uint16_t*)buf, txsize*2);
 
   count -= txsize;
 }

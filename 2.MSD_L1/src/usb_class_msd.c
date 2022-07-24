@@ -28,7 +28,7 @@ extern const uint8_t my_res_end[]     asm(FATSRC "_end");
 void scsi_reset();
 void scsi_command();
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -47,7 +47,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -61,7 +61,7 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
   )
 };
 
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size
@@ -151,9 +151,9 @@ void usb_class_get_std_descr(uint16_t descr, const void **data, uint16_t *size){
 #define USBCLASS_MSC_GET_MAX_LUN  0xFE
 #define USBCLASS_MSC_RESET        0xFF
 
-uint8_t maxlun = 15; //15; //больше 2 (maxlun=1) последние винды не умеют
+uint8_t maxlun = 7; //15; //больше 2 (maxlun=1) последние винды не умеют
 
-uint8_t rambuf[1024*29];
+USB_ALIGN uint8_t rambuf[1024*29];
 
 struct{
   uint32_t capacity;
@@ -309,18 +309,18 @@ struct usb_msc_sense{
 }__attribute__((packed));
 typedef struct usb_msc_sense usb_msc_sense_t;
 
-usb_msc_cbw_t msc_cbw;
+USB_ALIGN usb_msc_cbw_t msc_cbw;
 uint8_t msc_cbw_count = 0;
-usb_msc_csw_t msc_csw = {
+USB_ALIGN usb_msc_csw_t msc_csw = {
   .dSignature = 0x53425355, //волшебное чиселко
 };
 uint8_t msc_csw_count = 0;
-usb_msc_sense_t msc_sense = {0,0,0};
+USB_ALIGN usb_msc_sense_t msc_sense = {0,0,0};
 
 static uint32_t bytestowrite = 0;
 static uint32_t bytestoread = 0;
 static uint32_t bytescount = 0;
-static uint8_t buffer[MSC_MEDIA_PACKET];
+USB_ALIGN static uint8_t buffer[MSC_MEDIA_PACKET];
 
 uint32_t start_lba;
 uint16_t block_count;
@@ -358,10 +358,10 @@ static void msc_ep1_in(uint8_t epnum){
     uint32_t left = bytestowrite - bytescount;
     if(left > ENDP_SIZE)left = ENDP_SIZE;
     if(block_count == 0){
-      usb_ep_write(ENDP_NUM, &buffer[bytescount], left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)&buffer[bytescount], left);
     }else{
       uint8_t lun = msc_cbw.bLUN;
-      usb_ep_write(ENDP_NUM, &storage[lun].buf[start_lba*512 + bytescount], left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)&storage[lun].buf[start_lba*512 + bytescount], left);
       cur_count += left;
     }
     bytescount += left;
@@ -369,7 +369,7 @@ static void msc_ep1_in(uint8_t epnum){
     int32_t left = sizeof(msc_csw) - msc_csw_count;
     if(left > 0){
       if(left > ENDP_SIZE)left = ENDP_SIZE;
-      usb_ep_write(ENDP_NUM, (uint8_t*)&(((uint8_t*)&msc_csw)[msc_csw_count]), left);
+      usb_ep_write(ENDP_NUM, (uint16_t*)&(((uint8_t*)&msc_csw)[msc_csw_count]), left);
       msc_csw_count += left;
     }else if(left == 0){
       msc_cbw_count = 0;

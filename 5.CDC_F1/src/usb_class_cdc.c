@@ -23,7 +23,7 @@
 #define CDCPROTOCOL_UNDEF     0x00
 #define CDCPROTOCOL_VENDOR    0xFF
 
-static const uint8_t USB_DeviceDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceDescriptor[] = {
   ARRLEN1(
   bLENGTH,     // bLength
   USB_DESCR_DEVICE,   // bDescriptorType - Device descriptor
@@ -42,7 +42,7 @@ static const uint8_t USB_DeviceDescriptor[] = {
   )
 };
 
-static const uint8_t USB_DeviceQualifierDescriptor[] = {
+USB_ALIGN static const uint8_t USB_DeviceQualifierDescriptor[] = {
   ARRLEN1(
   bLENGTH,     //bLength
   USB_DESCR_QUALIFIER,   // bDescriptorType - Device qualifier
@@ -56,9 +56,7 @@ static const uint8_t USB_DeviceQualifierDescriptor[] = {
   )
 };
 
-#define F_SAMPLE 16000 //количество сэмплов в секунду
-
-static const uint8_t USB_ConfigDescriptor[] = {
+USB_ALIGN static const uint8_t USB_ConfigDescriptor[] = {
   ARRLEN34(
   ARRLEN1(
     bLENGTH, // bLength: Configuration Descriptor size
@@ -216,7 +214,7 @@ struct cdc_linecoding{
   uint8_t wordsize; //length of data word: 5,6,7,8 or 16 bits
 }__attribute__((packed));
 
-volatile struct cdc_linecoding linecoding = {
+USB_ALIGN volatile struct cdc_linecoding linecoding = {
   .baudrate = 0,
   .stopbits = 0,
   .parity = 0,
@@ -258,8 +256,8 @@ void ctl_callback(uint8_t epnum){
 }
 
 void data_out_callback(uint8_t epnum){
-  uint8_t buf[ ENDP_DATA_SIZE ];
-  int len = usb_ep_read_double( ENDP_DATA_OUT, buf);
+  USB_ALIGN uint8_t buf[ ENDP_DATA_SIZE ];
+  int len = usb_ep_read_double( ENDP_DATA_OUT, (uint16_t*)buf);
   if(len == 0)return;
   //if(buf[0] == 'a')GPO_ON(GLED);
   //if(buf[0] == 's')GPO_OFF(GLED);
@@ -276,9 +274,9 @@ void fmtu8(uint8_t x, char *buf){
 
 char test(){
   static uint8_t x = 0;
-  uint8_t ch[6];
-  fmtu8(x, ch);
-  usb_ep_write_double( ENDP_DATA_IN | 0x80, ch, sizeof(ch)-1);
+  USB_ALIGN uint8_t ch[6];
+  fmtu8(x, (char*)ch);
+  usb_ep_write_double( ENDP_DATA_IN | 0x80, (uint16_t*)ch, sizeof(ch)-1);
   x++;
   return 1;
 }
