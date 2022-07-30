@@ -320,8 +320,8 @@ static void msc_ep1_in(uint8_t epnum){
 }
 
 void usb_class_init(){
-  usb_ep_init(ENDP_NUM,        USB_EP_BULK, ENDP_SIZE, msc_ep1_out);
-  usb_ep_init(ENDP_NUM | 0x80, USB_EP_BULK, ENDP_SIZE, msc_ep1_in);
+  usb_ep_init(ENDP_NUM,        USB_ENDP_BULK, ENDP_SIZE, msc_ep1_out);
+  usb_ep_init(ENDP_NUM | 0x80, USB_ENDP_BULK, ENDP_SIZE, msc_ep1_in);
   virfat_init();
 }
 

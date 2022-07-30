@@ -321,8 +321,8 @@ static void msc_ep1_in(uint8_t epnum){
 }
 
 void usb_class_init(){
-  usb_ep_init(ENDP_NUM,        USB_EP_BULK, ENDP_SIZE, msc_ep1_out);
-  usb_ep_init(ENDP_NUM | 0x80, USB_EP_BULK, ENDP_SIZE, msc_ep1_in);
+  usb_ep_init(ENDP_NUM,        USB_ENDP_BULK, ENDP_SIZE, msc_ep1_out);
+  usb_ep_init(ENDP_NUM | 0x80, USB_ENDP_BULK, ENDP_SIZE, msc_ep1_in);
   virfat_init();
 }
 
@@ -331,16 +331,16 @@ void usb_class_init(){
 
 // Implemented SCSI Commands
 #define SCSI_TEST_UNIT_READY	0x00
-#define SCSI_REQUEST_SENSE		0x03
-#define SCSI_FORMAT_UNIT			0x04
-#define SCSI_READ_6					0x08
-#define SCSI_WRITE_6				0x0A
-#define SCSI_INQUIRY			0x12
-#define SCSI_MODE_SENSE_6			0x1A
-#define SCSI_SEND_DIAGNOSTIC		0x1D
-#define SCSI_READ_CAPACITY		0x25
-#define SCSI_READ_10			0x28
-#define SCSI_WRITE_10			0x2A
+#define SCSI_REQUEST_SENSE	0x03
+#define SCSI_FORMAT_UNIT	0x04
+#define SCSI_READ_6		0x08
+#define SCSI_WRITE_6		0x0A
+#define SCSI_INQUIRY		0x12
+#define SCSI_MODE_SENSE_6	0x1A
+#define SCSI_SEND_DIAGNOSTIC	0x1D
+#define SCSI_READ_CAPACITY	0x25
+#define SCSI_READ_10		0x28
+#define SCSI_WRITE_10		0x2A
 
 #define SCSI_MMC_START_STOP_UNIT      0x1B
 #define SCSI_MMC_PREVENT_ALLOW_REMOVAL 0x1E
