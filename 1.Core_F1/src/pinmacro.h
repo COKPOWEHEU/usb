@@ -60,6 +60,14 @@
         else GPIO(marg1(descr))->BSRR = (1<<marg2(descr)); \
     } \
   }while(0)
+#define GPIO_manual(port, mode) \
+  do{ \
+    GPIO_mode(marg1(port), marg2(port), mode); \
+    if(mode == GPIO_PULL){ \
+      if(marg3(port))GPIO(marg1(port))->BRR = (1<<marg2(port)); \
+        else GPIO(marg1(port))->BSRR = (1<<marg2(port)); \
+    } \
+  }while(0)
 #define GPO_ON(descr) \
   do{ \
     GPIO(marg1(descr))->BSRR = (1<<marg2(descr)<<((1-marg3(descr))*16)); \

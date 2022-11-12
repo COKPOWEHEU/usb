@@ -39,6 +39,8 @@ clean:
 	rm -rf $(builddir)
 prog: $(frmname).bin
 	openocd -f interface/stlink-v2.cfg -f target/stm32f1x.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
+ftdi: $(frmname).bin
+	openocd -f ft4232.cfg -f target/stm32f1x.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
 $(frmname).bin: $(frmname).elf
 	$(CP) -Obinary $(frmname).elf $(frmname).bin
 $(frmname).hex: $(frmname).elf

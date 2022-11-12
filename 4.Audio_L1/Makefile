@@ -45,16 +45,16 @@ all: $(frmname).bin $(frmname).hex $(frmname).lss size
 clean:
 	rm -rf $(progdir)
 	rm -rf $(builddir)
-prog2: $(frmname).bin
-	openocd -f interface/ft232r.cfg -f target/stm32l1.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
 prog: $(frmname).bin
 	openocd -f interface/stlink-v2.cfg -f target/stm32l1.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
-prog3: $(frmname).bin
+prog2: $(frmname).bin
 	-stm32flash -j /dev/ttyUSB0
 	sleep 1
 	-stm32flash -k /dev/ttyUSB0
 	sleep 1
 	-stm32flash -e 0 -w $(frmname).bin /dev/ttyUSB0
+ftdi: $(frmname).bin
+	openocd -f ft4232.cfg -f target/stm32l1.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
 #target/stm32l1x_dual_bank.cf
 $(frmname).bin: $(frmname).elf
 	$(CP) -Obinary $(frmname).elf $(frmname).bin
