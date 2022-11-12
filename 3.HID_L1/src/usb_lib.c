@@ -1,8 +1,10 @@
+//12.11.2022: add default EP callbacks
 //24.07.2022: remove USB_Addr global variable; change usb types (u8->u16); add USB_ALIGN macro
 //21.07.2022: Add default EPn callback; change sub-interrupt order (EPn -> SOF -> other)
 
 #include <stdint.h>
 #include "usb_lib.h"
+#include "pinmacro.h"
 #include "hardware.h"
 
 #ifndef NULL
@@ -58,6 +60,8 @@ epfunc_t epfunc_out[STM32ENDPOINTS];
 
 static config_pack_t setup_packet;
 
+//USB_PULLUP may be defined in "hardware.h"
+
 void USB_setup(){
   RCC->APB1ENR |= RCC_APB1ENR_USBEN;
 #ifdef SYSCFG_PMC_USB_PU
@@ -66,10 +70,14 @@ void USB_setup(){
 #elif defined USB_PULLUP
   GPIO_config( USB_PULLUP );
   GPO_OFF( USB_PULLUP );
+#elif defined EXTEN_USBD_PU_EN //compatibilyty with CH32F1 (thx Олег Свиридов, my_xfiles@mail.ru)
+  EXTEN->EXTEN_CTR &= ~EXTEN_USBD_PU_EN;
 #else
   #warning USB_PULLUP undefined
 #endif
-  USB->CNTR   = USB_CNTR_FRES; // Force USB Reset
+  USB->CNTR = USB_CNTR_FRES; // Force USB Reset
+  //Initialization of callback functions (thx Олег Свиридов, my_xfiles@mail.ru)
+  for(uint8_t i=0; i<STM32ENDPOINTS; i++)epfunc_in[i] = epfunc_out[i] = endp_callback_default;
   for(uint32_t ctr = 0; ctr < 100000; ++ctr) asm volatile("nop"); // wait >1ms
   USB->CNTR   = 0;
   USB->BTABLE = 0;
@@ -79,6 +87,8 @@ void USB_setup(){
   NVIC_EnableIRQ(USB_LP_IRQn);
 #ifdef SYSCFG_PMC_USB_PU
   SYSCFG->PMC |= SYSCFG_PMC_USB_PU;
+#elif defined EXTEN_USBD_PU_EN
+  EXTEN->EXTEN_CTR |= EXTEN_USBD_PU_EN;
 #elif defined USB_PULLUP
   GPO_ON( USB_PULLUP );
 #endif
@@ -278,19 +288,22 @@ void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t 
     
   lastaddr += 2*size;
 }
-
-// standard IRQ handler
+//-----------------------------------------------------------------------
+//--------- USB IRQ handler----------------------------------------------
+//-----------------------------------------------------------------------
 void USB_LP_IRQHandler(){
   if(USB->ISTR & USB_ISTR_CTR){
-    uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
-    if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
-      epfunc_out[epnum](epnum);
-      ENDP_CTR_RX_CLR(epnum);
-    }
-    if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
-      epfunc_in[epnum](epnum | 0x80);
-      ENDP_CTR_TX_CLR(epnum);
-    }
+    do{
+      uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
+      if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
+        epfunc_out[epnum](epnum);
+        ENDP_CTR_RX_CLR(epnum);
+      }
+      if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
+        epfunc_in[epnum](epnum | 0x80);
+        ENDP_CTR_TX_CLR(epnum);
+      }
+    }while(USB->ISTR & USB_ISTR_CTR);
     return;
   }
   
@@ -309,9 +322,8 @@ void USB_LP_IRQHandler(){
     #endif
     lastaddr = LASTADDR_DEFAULT;
     USB->DADDR = USB_DADDR_EF;
-    for(uint8_t i=0; i<STM32ENDPOINTS; i++){
-      epfunc_in[i] = epfunc_out[i] = NULL;
-    }
+    for(uint8_t i=0; i<STM32ENDPOINTS; i++)epfunc_in[i] = epfunc_out[i] = endp_callback_default;
+    
     // state is default - wait for enumeration
     USB->ISTR = (uint16_t)~USB_ISTR_RESET;
     usb_ep_init(0x00, USB_ENDP_CTRL, USB_EP0_BUFSZ, ep0_out);

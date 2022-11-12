@@ -292,16 +292,18 @@ void usb_ep_init_double(uint8_t epnum, uint8_t ep_type, uint16_t size, epfunc_t 
 //--------- USB IRQ handler----------------------------------------------
 //-----------------------------------------------------------------------
 void USB_LP_IRQHandler(){
-  while(USB->ISTR & USB_ISTR_CTR){
-    uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
-    if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
-      epfunc_out[epnum](epnum);
-      ENDP_CTR_RX_CLR(epnum);
-    }
-    if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
-      epfunc_in[epnum](epnum | 0x80);
-      ENDP_CTR_TX_CLR(epnum);
-    }
+  if(USB->ISTR & USB_ISTR_CTR){
+    do{
+      uint8_t epnum = USB->ISTR & USB_ISTR_EP_ID;
+      if(USB_EPx(epnum) & USB_EP_CTR_RX){ //OUT
+        epfunc_out[epnum](epnum);
+        ENDP_CTR_RX_CLR(epnum);
+      }
+      if(USB_EPx(epnum) & USB_EP_CTR_TX){//IN
+        epfunc_in[epnum](epnum | 0x80);
+        ENDP_CTR_TX_CLR(epnum);
+      }
+    }while(USB->ISTR & USB_ISTR_CTR);
     return;
   }
   
