@@ -72,9 +72,17 @@ void USB_setup(){
   GPO_OFF( USB_PULLUP );
 #elif defined EXTEN_USBD_PU_EN //compatibilyty with CH32F1 (thx Олег Свиридов, my_xfiles@mail.ru)
   EXTEN->EXTEN_CTR &= ~EXTEN_USBD_PU_EN;
+#elif defined USB_DP
+  USB->CNTR = USB_CNTR_FRES; // Force USB Reset
+  USB->CNTR = USB_CNTR_PDWN;
+  GPIO_manual( USB_DP, GPIO_OD50 );
+  GPO_OFF(USB_DP);
+  for(uint32_t ctr = 0; ctr < 100000; ++ctr) asm volatile("nop"); // wait >1ms
+  GPIO_manual( USB_DP, GPIO_HIZ );
 #else
   #warning USB_PULLUP undefined
 #endif
+
   USB->CNTR = USB_CNTR_FRES; // Force USB Reset
   //Initialization of callback functions (thx Олег Свиридов, my_xfiles@mail.ru)
   for(uint8_t i=0; i<STM32ENDPOINTS; i++)epfunc_in[i] = epfunc_out[i] = endp_callback_default;

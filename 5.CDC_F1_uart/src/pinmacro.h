@@ -1,6 +1,8 @@
 #ifndef __PINMACRO_H__
 #define __PINMACRO_H__
 
+//2021.07.13
+
 #define GPIO_OUT  0b0000 //output
 #define GPIO_ALT  0b1000 //alternative function output
 #define GPIO_PP   0b0000 //push-pull
@@ -30,11 +32,20 @@
 #define concat2(a,b,...)  a##b
 #define concat3(a,b,c,...)  a#b#c
 
-#define marg1(a,...)  a
-#define marg2(a,b,...)  b
-#define marg3(a,b,c,...)  c
-#define marg4(a,b,c,d,...)  d
-#define GPIO(x) concat2(GPIO,x)
+#define _marg1(a,...)  a
+#define _marg2(a,b,...)  b
+#define _marg3(a,b,c,...)  c
+#define _marg4(a,b,c,d,...)  d
+#define marg1(x) _marg1(x)
+#define marg2(x) _marg2(x)
+#define marg3(x) _marg3(x)
+#define marg4(x) _marg4(x)
+#define _GPIO(port) GPIO##port
+#define GPIO(x) _GPIO(x)
+
+#define PM_BITMASK( reg, mask, val ) do{\
+    reg = (reg &~ mask) | ((mask &~(mask<<1))*val); \
+  }while(0)
 
 #define _GPIO_CONFIG(port, bit, letter, mode) \
   do{\
@@ -54,33 +65,33 @@
 
 #define GPIO_config(descr) \
   do{ \
-    GPIO_mode(marg1(descr), marg2(descr), marg4(descr)); \
-    if(marg4(descr) == GPIO_PULL){ \
-      if(marg3(descr))GPIO(marg1(descr))->BRR = (1<<marg2(descr)); \
-        else GPIO(marg1(descr))->BSRR = (1<<marg2(descr)); \
+    GPIO_mode(_marg1(descr), _marg2(descr), _marg4(descr)); \
+    if(_marg4(descr) == GPIO_PULL){ \
+      if(_marg3(descr))GPIO(_marg1(descr))->BRR = (1<<_marg2(descr)); \
+        else GPIO(_marg1(descr))->BSRR = (1<<_marg2(descr)); \
     } \
   }while(0)
-#define GPIO_manual(port, mode) \
+#define GPIO_manual(descr, mode) \
   do{ \
-    GPIO_mode(marg1(port), marg2(port), mode); \
+    GPIO_mode(_marg1(descr), _marg2(descr), mode); \
     if(mode == GPIO_PULL){ \
-      if(marg3(port))GPIO(marg1(port))->BRR = (1<<marg2(port)); \
-        else GPIO(marg1(port))->BSRR = (1<<marg2(port)); \
+      if(_marg3(descr))GPIO(_marg1(descr))->BRR = (1<<_marg2(descr)); \
+        else GPIO(_marg1(descr))->BSRR = (1<<_marg2(descr)); \
     } \
   }while(0)
 #define GPO_ON(descr) \
   do{ \
-    GPIO(marg1(descr))->BSRR = (1<<marg2(descr)<<((1-marg3(descr))*16)); \
+    GPIO(_marg1(descr))->BSRR = (1<<_marg2(descr)<<((1-_marg3(descr))*16)); \
   }while(0)
 #define GPO_OFF(descr) \
   do{ \
-    GPIO(marg1(descr))->BSRR = (1<<marg2(descr)<<((marg3(descr))*16)); \
+    GPIO(_marg1(descr))->BSRR = (1<<_marg2(descr)<<((_marg3(descr))*16)); \
   }while(0)
 #define GPO_T(descr) \
   do{ \
-    GPIO(marg1(descr))->ODR ^= (1<<marg2(descr)); \
+    GPIO(_marg1(descr))->ODR ^= (1<<_marg2(descr)); \
   }while(0)
-#define GPI_ON(descr)  ((GPIO(marg1(descr))->IDR & (1<<marg2(descr)))==(marg3(descr)<<marg2(descr)))
-#define GPI_OFF(descr) ((GPIO(marg1(descr))->IDR & (1<<marg2(descr)))!=(marg3(descr)<<marg2(descr)))
+#define GPI_ON(descr)  ((GPIO(_marg1(descr))->IDR & (1<<_marg2(descr)))==(_marg3(descr)<<_marg2(descr)))
+#define GPI_OFF(descr) ((GPIO(_marg1(descr))->IDR & (1<<_marg2(descr)))!=(_marg3(descr)<<_marg2(descr)))
 
 #endif
