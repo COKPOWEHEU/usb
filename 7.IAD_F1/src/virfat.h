@@ -92,17 +92,23 @@ void firmware_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
 
 //  Example makefile
 const char make_file[] =
-"test:\n"
+"test_stflash:\n"
 "	stty -F /dev/tty_STFLASH_0 300\n"
 "	stty -F /dev/tty_STFLASH_0 50\n"
 "	echo 'RBU' > /dev/tty_STFLASH_0\n"
 "	echo 'rBU' > /dev/tty_STFLASH_0\n"
 "	sleep 1\n"
-"	stm32flash -r /dev/null -S 0x08000000:32768 /dev/tty_STFLASH_0\n"
+"	stm32flash -r read.bin -S 0x08000000:32768 /dev/tty_STFLASH_0\n"
 "	sleep 1\n"
 "	echo 'RbU' > /dev/tty_STFLASH_0\n"
 "	sleep 1\n"
 "	echo 'rbuz' > /dev/tty_STFLASH_0\n"
+"test_arduino:\n"
+"	stty -F /dev/tty_STFLASH_0 9600\n"
+"	stty -F /dev/tty_STFLASH_0 50\n"
+"	avrdude -c arduino -p atmega8 -P /dev/tty_STFLASH_0 -b 115200 -Uflash:r:/dev/null:i\n"
+"	stty -F /dev/tty_STFLASH_0 50\n"
+"	echo 'z' > /dev/tty_STFLASH_0\n"
 ;
 //  Example udev rules file
 const char rules_file[] =
@@ -112,22 +118,25 @@ const char rules_file[] =
 "ENV{CONNECTED_COKP}==\"yes\", SUBSYSTEM==\"tty\", ATTRS{interface}==\"?*\", PROGRAM=\"/bin/bash -c \\\"ls /dev | grep tty_$attr{interface}_ | wc -l \\\"\", SYMLINK+=\"tty_$attr{interface}_%c\"\n"
 ;
 // Hardware info file
+#define _STR(x) #x
+#define STR(x) _STR(x)
 const char hardware_file[] =
 "stm32f103\r\n"
 "\tUART:\r\n"
-"\t\tTx = PA9\r\n"
-"\t\tRx = PA10\r\n"
-"\tReset_out = PA8\r\n"
-"\tBoot0_out = PC13\r\n"
-"\tUSBR (USB relay) = PB2\r\n"
+"\t\tTx = P" STR(marg1(UART_TX)) STR(marg2(UART_TX)) "\r\n"
+"\t\tRx = P" STR(marg1(UART_RX)) STR(marg2(UART_RX)) "\r\n"
+"\t\tDTR= P" STR(marg1(DTR)) STR(marg2(DTR)) "\r\n"
+"\tReset_out = P" STR(marg1(RESET)) STR(marg2(RESET)) "\r\n"
+"\tBoot0_out = P" STR(marg1(BOOT0)) STR(marg2(BOOT0)) "\r\n"
+"\tUSBR (USB relay) = P" STR(marg1(USBR)) STR(marg2(USBR)) "\r\n"
 "\r\n"
 "\tLEDS:\r\n"
-"\t\tGreen (debug mode): PB7\r\n"
-"\t\tRed (programming mode): PB5\r\n"
-"\t\tRed + Green (change Reset, Boot0, USBR pins status): PB5 + PB7\r\n"
+"\t\tGreen (debug mode): P" STR(marg1(GLED)) STR(marg2(GLED)) "\r\n"
+"\t\tRed (programming mode): P" STR(marg1(RLED)) STR(marg2(RLED)) "\r\n"
+"\t\tRed + Green (change Reset, Boot0, USBR pins status): Red + Green\r\n"
 "\r\n"
 "Connect UART of this programmer to UART of target microcontroller, Reset_out pin to Reset and Boot0_out to BOOT0. If needed connect USBR to relay disconnecting D+,D- of target. Edit or copy udev rules according example.\r\n"
-"Then run 'make test' to test connection. You also may use this MAKEFILE as example to burn firmwaries\r\n"
+"Then run 'make test_stflash' or 'make test_arduino' to test connection. You also may use this MAKEFILE as example to burn firmwaries\r\n"
 ;
 
 const char lufa_driver_file[] =

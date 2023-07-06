@@ -39,6 +39,8 @@ clean:
 	rm -rf $(builddir)
 prog: $(frmname).bin
 	openocd -f interface/stlink-v2.cfg -f target/stm32f1x.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
+reset: $(frmname).bin
+	openocd -f interface/stlink-v2.cfg -f target/stm32f1x.cfg -c "init" -c "reset halt" -c "reset run" -c "exit"
 ftdi: $(frmname).bin
 	openocd -f ft4232.cfg -f target/stm32f1x.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
 	
@@ -62,16 +64,22 @@ $(builddir)/%.o: $(srcdir)/%.c
 	mkdir -p $(builddir)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-test_l151:
+test_stflash:
 	stty -F /dev/tty_STFLASH_0 300
 	stty -F /dev/tty_STFLASH_0 50
 	echo 'RBU' > /dev/tty_STFLASH_0
 	echo 'rBU' > /dev/tty_STFLASH_0
 	sleep 1
-	stm32flash -e 0 -r read.bin -S 0x08000000:32768 /dev/tty_STFLASH_0
+	stm32flash -r read.bin -S 0x08000000:32768 /dev/tty_STFLASH_0
 	sleep 1
 	echo 'RbU' > /dev/tty_STFLASH_0
 	sleep 1
 	echo 'rbuz' > /dev/tty_STFLASH_0
+test_arduino:
+	stty -F /dev/tty_STFLASH_0 9600
+	stty -F /dev/tty_STFLASH_0 50
+	avrdude -c arduino -p atmega8 -P /dev/tty_STFLASH_0 -b 115200 -Uflash:r:/dev/null:i
+	stty -F /dev/tty_STFLASH_0 50
+	echo 'z' > /dev/tty_STFLASH_0
 	
 -include $(shell mkdir -p $(builddir)/dep) $(wildcard $(builddir)/dep/*)

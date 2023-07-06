@@ -18,10 +18,10 @@ int main(void){
   RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN;
 
   GPIO_config(RLED); GPIO_config(GLED);
-  GPIO_config(USBR); GPIO_config(RESET); GPIO_config(BOOT0);
+  GPIO_config(USBR); GPIO_config(RESET); GPIO_config(BOOT0); GPIO_config(DTR);
   
   GPO_OFF(RLED); GPO_OFF(GLED);
-  GPO_OFF(RESET); GPO_OFF(BOOT0); GPO_OFF(USBR);
+  GPO_OFF(RESET); GPO_OFF(BOOT0); GPO_OFF(USBR); GPO_OFF(DTR);
   
   USB_setup();
   __enable_irq();

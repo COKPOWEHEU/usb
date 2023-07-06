@@ -12,6 +12,7 @@
 #define USBR	B,2,0,GPIO_PP50
 #define RESET   C,13,0,GPIO_PP50
 #define BOOT0   A,8,1,GPIO_PP50
+#define DTR		B,15,0,GPIO_PP50
 
 #define jtag_disable() do{\
   RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;\

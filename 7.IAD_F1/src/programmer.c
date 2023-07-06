@@ -110,6 +110,7 @@ char programmer_ep0_out(config_pack_t *req, uint16_t offset, uint16_t rx_size){
         return 1;
       }
     }else if( req->bRequest == CDC_SET_CTRL_LINES ){
+      if( req->wValue & (1<<0) )GPO_ON(DTR); else GPO_OFF(DTR);
       //wValue bits:
       //  7-2 : reserved
       //  1   : RTS
@@ -122,10 +123,9 @@ char programmer_ep0_out(config_pack_t *req, uint16_t offset, uint16_t rx_size){
 static void cdc_out(uint8_t epnum){
   USB_ALIGN uint8_t buf[ENDP_TTY_SIZE];
   int size;
-  //какая точка активна в данный момент?
   if(ttymode == TTYM_NORMAL){
     epnum = ENDP_TTY_OUT;
-    if(usb_ep_ready( ENDP_PROG_OUT))usb_ep_read( ENDP_PROG_OUT, (void*)buf );
+    if(usb_ep_ready( ENDP_PROG_OUT ))usb_ep_read( ENDP_PROG_OUT, (void*)buf );
     if(!usb_ep_ready(ENDP_TTY_OUT ))return;
   }else{
     epnum = ENDP_PROG_OUT;
