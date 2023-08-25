@@ -83,7 +83,8 @@ void virfat_write(uint8_t *buf, uint32_t addr);//write 1 sector by address (addr
 //////////////////////////////////////////////////////////////
 extern const uint8_t *flash_end     asm("_etext");
 extern const uint8_t *ram_end       asm("_edata");
-#define FLASH_SIZE	20480 //размер прошивки. Взят с запасом, в компил-тайме его не вычислить
+#define FLASH_SIZE	40960 //размер прошивки. Взят с запасом, в компил-тайме его не вычислить
+#include "../build/src_zip.h"
 
 void firmware_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
   const uint8_t *flash = (uint8_t*)0x08000000;
@@ -223,6 +224,9 @@ void file_read(uint8_t *buf, uint32_t addr, uint16_t file_idx){
   }else if(file_idx == 4){
     txt = lufa_driver_file;
     sz = sizeof(lufa_driver_file);
+  }else if(file_idx == 5){
+    txt = (char*)src_zip;
+    sz = sizeof(src_zip);
   }
   addr *= 512;
   int en = 512;
@@ -277,6 +281,12 @@ static const virfat_file_t virfat_rootdir[] = {
     .file_read = file_read,
     .file_write = virfat_file_dummy,
     .size = (sizeof(lufa_driver_file)+511)/512,
+  },
+  {
+    .name = "SRC     ZIP",
+    .file_read = file_read,
+    .file_write = virfat_file_dummy,
+    .size = (sizeof(src_zip)+511)/512,
   },
 };
 

@@ -20,6 +20,8 @@ CFLAGS += -mthumb -mcpu=cortex-m3 -g$(DEBUG) -O$(OPTIMIZE) -D$(DEVCLASS) $(INCLU
 ASMFLAGS = -ahls -mapcs-32
 LFLAGS  = $(LINKERCMDFILE) -nostartfiles -Wl,-Map -Wl,$(builddir)/$(progname).map -mthumb -mcpu=cortex-m3
 
+
+
 CC      = arm-none-eabi-gcc
 CPP      = arm-none-eabi-g++
 #LD      = arm-none-eabi-ld -v
@@ -37,6 +39,10 @@ all: $(frmname).bin $(frmname).hex $(frmname).lss size
 clean:
 	rm -rf $(progdir)
 	rm -rf $(builddir)
+test:
+	echo $(calc_zip_size)
+	echo
+	echo $(CFLAGS)
 prog: $(frmname).bin
 	openocd -f interface/stlink-v2.cfg -f target/stm32f1x.cfg -c "init" -c "reset halt" -c "flash write_image erase "$(frmname).bin" 0x08000000" -c "reset run" -c "exit"
 reset: $(frmname).bin
@@ -56,10 +62,21 @@ $(frmname).elf: $(objs) $(builddir)/crt.o
 	mkdir -p $(progdir)
 	@ echo "..linking"
 	$(LD) $(LFLAGS) -o $(frmname).elf $(builddir)/crt.o -L../ld $(objs)
+	
+$(builddir)/usb_class_msd.o: $(builddir)/src_zip.h
+$(builddir)/src_zip.h:
+	mkdir -p $(builddir)
+	@echo "Build src_zip.h"
+	rm -f $(builddir)/src.zip
+	zip -r $(builddir)/src.zip src > /dev/null
+	zip $(builddir)/src.zip Makefile > /dev/null
+	echo "const uint8_t src_zip[] = {" > $@
+	hexdump -v -e '1/1 "0x%.2X,"' $(builddir)/src.zip >> $@
+	echo "};" >> $@
+	
 $(builddir)/crt.o:
 	mkdir -p $(builddir)
 	$(AS) -o $(builddir)/crt.o $(startup)
-	
 $(builddir)/%.o: $(srcdir)/%.c
 	mkdir -p $(builddir)
 	$(CC) $(CFLAGS) -c $< -o $@
