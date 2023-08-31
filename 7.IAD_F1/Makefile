@@ -72,6 +72,7 @@ $(builddir)/src_zip.h:
 	zip $(builddir)/src.zip Makefile > /dev/null
 	echo "const uint8_t src_zip[] = {" > $@
 	hexdump -v -e '1/1 "0x%.2X,"' $(builddir)/src.zip >> $@
+	#xxd -i $(builddir)/src.zip >> $@
 	echo "};" >> $@
 	
 $(builddir)/crt.o:
