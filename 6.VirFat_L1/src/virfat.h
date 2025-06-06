@@ -373,7 +373,8 @@ static inline void _virfat_read_root(uint8_t *buf, uint32_t addr){
     file_addr += virfat_rootdir[j].size;
   }
   
-  elem += i;
+#warning Error detected on CH32V203. TODO: test on STM32!
+  //elem += i;
   uint16_t cnt = 0;
   
 #ifdef VIRFAT_VOLNAME
@@ -387,9 +388,11 @@ static inline void _virfat_read_root(uint8_t *buf, uint32_t addr){
     elem[0].size = 0;
     cnt++;
     elem++;
-    i++;
+    //i++;
+    i--;
   }
-  i--;
+  //i--;
+  i++;
 #endif
   
   for(; i<VIRFAT_FILES_TOTAL; i++, cnt++){
